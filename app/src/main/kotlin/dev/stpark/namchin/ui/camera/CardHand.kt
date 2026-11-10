@@ -70,10 +70,10 @@ fun CardHand(
     modifier: Modifier = Modifier,
 ) {
     val shown = references.take(CardFan.MAX_CARDS)
+    if (shown.isEmpty()) return
     val fan = CardFan.layout(shown.size)
     Box(
         modifier
-            .size(170.dp, 190.dp)
             // 화면 가장자리(내비게이션 바 위)에서 잘려 "빼꼼" 보이게
             .clipToBounds()
             .pointerInput(Unit) {

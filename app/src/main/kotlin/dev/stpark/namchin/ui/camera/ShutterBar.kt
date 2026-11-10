@@ -26,7 +26,7 @@ import dev.stpark.namchin.data.Reference
 @Composable
 fun ShutterBar(
     latestReference: Reference?,
-    capturing: Boolean,
+    enabled: Boolean,
     onShutter: () -> Unit,
     onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
@@ -56,8 +56,8 @@ fun ShutterBar(
                 .border(4.dp, Color.White, CircleShape)
                 .padding(8.dp)
                 .clip(CircleShape)
-                .background(if (capturing) Color.Gray else Color.White)
-                .clickable(enabled = !capturing, onClick = onShutter)
+                .background(if (enabled) Color.White else Color.Gray)
+                .clickable(enabled = enabled, onClick = onShutter)
                 .semantics { contentDescription = shutterLabel },
         )
     }

@@ -96,6 +96,7 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
                         reference = reference,
                         onShoot = { toCamera(s.id) },
                         onDelete = {
+                            if (s.id == cameraReferenceId) cameraReferenceId = null
                             referencesVm.delete(s.id)
                             screen = Screen.Library
                         },

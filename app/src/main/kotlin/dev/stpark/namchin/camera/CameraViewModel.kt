@@ -3,7 +3,6 @@ package dev.stpark.namchin.camera
 import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import dev.stpark.namchin.core.live.CropRegion
 import dev.stpark.namchin.core.live.LiveGuidance
 import dev.stpark.namchin.core.live.LiveInput
@@ -12,13 +11,11 @@ import dev.stpark.namchin.core.live.LiveState
 import dev.stpark.namchin.core.live.Region
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.data.Reference
-import dev.stpark.namchin.data.ReferenceRepository
 import dev.stpark.namchin.ml.MlKitPoseMapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 /**
  * @property region 분석 프레임 안에서 레퍼런스 비율로 실제 찍힐 영역
@@ -35,27 +32,20 @@ data class CameraUiState(
 )
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
-    private val repository = ReferenceRepository.get(app)
     private val _state = MutableStateFlow(CameraUiState())
     val state: StateFlow<CameraUiState> = _state.asStateFlow()
     private var live = LiveState()
     private var lastFrameAt = 0L
 
     /**
-     * 레퍼런스를 바꿀 때마다 새로 시작한다 (같은 레퍼런스면 다시 불러오지 않음).
-     * @param referenceId null이면 기본 모드
+     * 화면에 들어오거나 레퍼런스를 바꿀 때마다 새로 시작한다.
+     * 이미 메모리에 있는 레퍼런스를 받으므로 비동기 조회 경쟁이 없다.
+     * @param reference null이면 기본 모드
      */
-    fun start(referenceId: Long?) {
-        val cached = _state.value.reference?.takeIf { it.id == referenceId }
+    fun start(reference: Reference?) {
         live = LiveState()
         lastFrameAt = 0L
-        _state.value = CameraUiState(reference = cached)
-        if (referenceId != null && cached == null) {
-            viewModelScope.launch {
-                val reference = repository.get(referenceId)
-                _state.update { it.copy(reference = reference) }
-            }
-        }
+        _state.value = CameraUiState(reference = reference)
     }
 
     fun onTilt(degrees: Float?) = _state.update { it.copy(rollDegrees = degrees) }

@@ -41,6 +41,9 @@ import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraUiState
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.GuidanceText
+import dev.stpark.namchin.camera.ShutterGate
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import dev.stpark.namchin.camera.ZoomLogic
 import androidx.camera.core.Camera
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -86,7 +89,7 @@ fun CameraScreen(
 
     Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
         if (granted) {
-            CameraContent(referenceId, references.orEmpty(), onSelectReference, onOpenLibrary)
+            CameraContent(referenceId, references, onSelectReference, onOpenLibrary)
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -105,12 +108,13 @@ fun CameraScreen(
 @Composable
 private fun CameraContent(
     referenceId: Long?,
-    references: List<Reference>,
+    references: List<Reference>?,
     onSelectReference: (Long?) -> Unit,
     onOpenLibrary: () -> Unit,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
+    val all = references.orEmpty()
     val vm: CameraViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     var ghostAlpha by rememberSaveable { mutableFloatStateOf(0.35f) }
@@ -129,22 +133,26 @@ private fun CameraContent(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(referenceId) { vm.start(referenceId) }
+    // 목록이 로드된 뒤 고른 레퍼런스로 시작 (id가 같으면 목록이 갱신돼도 다시 시작하지 않음)
+    val loaded = references != null
+    LaunchedEffect(referenceId, loaded) {
+        if (referenceId == null || loaded) vm.start(references?.firstOrNull { it.id == referenceId })
+    }
     // 화면이 보일 때만 센서 사용
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { tiltDegrees(context).collect(vm::onTilt) }
     }
     val reference = state.reference
-    // 저장되는 사진도 화면의 밝은 영역(레퍼런스 비율)과 같게 자른다
-    LaunchedEffect(imageCapture, reference) {
-        imageCapture?.setCropAspectRatio(reference?.let { Rational(it.width, it.height) } ?: Rational(3, 4))
-    }
     LaunchedEffect(flash) { if (flash) { delay(FLASH_MS); flash = false } }
     LaunchedEffect(message) { if (message != null) { delay(MESSAGE_MS); message = null } }
     BackHandler(enabled = deckOpen) { deckOpen = false }
 
+    val canShoot = ShutterGate.canShoot(referenceId, reference?.id, imageCapture != null, capturing)
     val shoot = shoot@{
         val capture = imageCapture ?: return@shoot
+        if (!ShutterGate.canShoot(referenceId, reference?.id, true, capturing)) return@shoot
+        // 저장되는 사진도 화면의 밝은 영역(레퍼런스 비율)과 같게 자른다. 비율은 촬영 시점에 읽힌다
+        capture.setCropAspectRatio(reference?.let { Rational(it.width, it.height) } ?: Rational(3, 4))
         capturing = true
         flash = true
         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -218,34 +226,37 @@ private fun CameraContent(
                     Slider(value = ghostAlpha, onValueChange = { ghostAlpha = it }, modifier = Modifier.padding(start = 12.dp).weight(1f))
                 }
             }
-            ShutterBar(
-                latestReference = references.firstOrNull(),
-                capturing = capturing,
-                onShutter = shoot,
-                onOpenLibrary = onOpenLibrary,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
-            Text(
-                stringResource(
-                    R.string.camera_stats,
-                    state.analysisMs.toInt(),
-                    state.fps,
-                    state.output?.match?.let { "%.2f".format(it.score) } ?: "-",
-                ),
-                color = Color.Gray,
-                fontSize = 10.sp,
-                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
-            )
+            // 셔터 줄: 카드 손패는 이 칸 안의 오른쪽에만 둬서 다른 버튼 터치를 가로채지 않는다
+            Box(Modifier.fillMaxWidth().weight(1f)) {
+                ShutterBar(
+                    latestReference = all.firstOrNull(),
+                    enabled = canShoot,
+                    onShutter = shoot,
+                    onOpenLibrary = onOpenLibrary,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Text(
+                    stringResource(
+                        R.string.camera_stats,
+                        state.analysisMs.toInt(),
+                        state.fps,
+                        state.output?.match?.let { "%.2f".format(it.score) } ?: "-",
+                    ),
+                    color = Color.Gray,
+                    fontSize = 10.sp,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 4.dp),
+                )
+                CardHand(
+                    references = all.filter { it.id != referenceId },
+                    onSelect = { onSelectReference(it.id) },
+                    onExpand = { deckOpen = true },
+                    modifier = Modifier.align(Alignment.BottomEnd).width(150.dp).fillMaxHeight(),
+                )
+            }
         }
-        CardHand(
-            references = references.filter { it.id != referenceId },
-            onSelect = { onSelectReference(it.id) },
-            onExpand = { deckOpen = true },
-            modifier = Modifier.align(Alignment.BottomEnd),
-        )
         if (deckOpen) {
             CardDeck(
-                references = references,
+                references = all,
                 onSelect = {
                     deckOpen = false
                     onSelectReference(it.id)
