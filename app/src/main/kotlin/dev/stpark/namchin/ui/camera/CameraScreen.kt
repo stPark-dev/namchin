@@ -277,9 +277,9 @@ private fun CameraContent(
             color = colorPreview,
             onPreviewColor = reviewVm::previewColor,
             onClearColor = reviewVm::clearColor,
-            onSaveColored = { id, strength ->
+            onSaveColored = { id, strength, keepLightness ->
                 message = R.string.color_saving
-                reviewVm.saveColored(id, strength) { ok ->
+                reviewVm.saveColored(id, strength, keepLightness) { ok ->
                     message = if (ok) R.string.color_saved else R.string.color_save_failed
                 }
             },

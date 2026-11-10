@@ -31,7 +31,7 @@ sealed interface ReviewState {
 }
 
 /** 레퍼런스 색감을 입힌 미리보기. */
-data class ColorPreview(val shotId: String, val strength: Float, val bitmap: Bitmap)
+data class ColorPreview(val shotId: String, val strength: Float, val keepLightness: Boolean, val bitmap: Bitmap)
 
 /** 연속 촬영 결과에서 베스트 컷을 고르고, 원하면 고른 한 장만 남기고 나머지를 갤러리에서 지운다. */
 class ReviewViewModel(app: Application) : AndroidViewModel(app) {
@@ -45,21 +45,21 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private var colorJob: Job? = null
     private var saveJob: Job? = null
 
-    /** 사진별 색 변환표와 미리보기 바탕 (같은 사진에서 슬라이더만 움직이면 다시 만들지 않음) */
-    private val luts = mutableMapOf<String, ColorLut>()
+    /** 사진·밝기 유지 여부별 색 변환표와 미리보기 바탕 (같은 사진에서 슬라이더만 움직이면 다시 만들지 않음) */
+    private val luts = mutableMapOf<Pair<String, Boolean>, ColorLut>()
     private val previewBases = mutableMapOf<String, Bitmap>()
 
     /** 선택한 사진에 레퍼런스 색감을 입힌 미리보기. 연달아 불리면 마지막 요청만 처리한다. */
-    fun previewColor(shotId: String, strength: Float) {
+    fun previewColor(shotId: String, strength: Float, keepLightness: Boolean) {
         val reference = (_state.value as? ReviewState.Ready)?.reference ?: return
         colorJob?.cancel()
         colorJob = viewModelScope.launch(Dispatchers.Default) {
             try {
                 val app = getApplication<Application>()
-                val lut = luts.getOrPut(shotId) { ColorMatcher.lut(app, reference, Uri.parse(shotId)) }
+                val lut = lut(reference, shotId, keepLightness)
                 val base = previewBases.getOrPut(shotId) { BitmapLoader.load(app, Uri.parse(shotId), PREVIEW_DIMENSION) }
                 ensureActive()
-                _color.value = ColorPreview(shotId, strength, ColorMatcher.applied(base, lut, strength))
+                _color.value = ColorPreview(shotId, strength, keepLightness, ColorMatcher.applied(base, lut, strength))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -74,20 +74,25 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 원본 해상도로 색감을 입혀 새 파일로 저장 (원본 유지). */
-    fun saveColored(shotId: String, strength: Float, onDone: (Boolean) -> Unit) {
+    fun saveColored(shotId: String, strength: Float, keepLightness: Boolean, onDone: (Boolean) -> Unit) {
         val reference = (_state.value as? ReviewState.Ready)?.reference ?: return
         if (saveJob?.isActive == true) return
         saveJob = viewModelScope.launch {
             val ok = withContext(Dispatchers.Default + NonCancellable) {
                 runCatching {
                     val app = getApplication<Application>()
-                    val lut = luts.getOrPut(shotId) { ColorMatcher.lut(app, reference, Uri.parse(shotId)) }
+                    val lut = lut(reference, shotId, keepLightness)
                     ColorMatcher.saveColored(app, Uri.parse(shotId), lut, strength)
                 }.onFailure { Log.w(TAG, "색감 저장 실패", it) }.isSuccess
             }
             onDone(ok)
         }
     }
+
+    private fun lut(reference: Reference, shotId: String, keepLightness: Boolean): ColorLut =
+        luts.getOrPut(shotId to keepLightness) {
+            ColorMatcher.lut(getApplication(), reference, Uri.parse(shotId), keepLightness)
+        }
 
     private fun clearColorCache() {
         clearColor()

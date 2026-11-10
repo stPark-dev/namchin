@@ -36,11 +36,14 @@ class ColorStats(val mean: DoubleArray, val std: DoubleArray) {
  * 퍼짐 비율은 MIN_SCALE..MAX_SCALE로 제한해 피부톤·대비가 과하게 튀지 않게 한다.
  *
  * @param strength 0 = 원본, 1 = 레퍼런스 색감 그대로
+ * @param keepLightness true면 밝기(L)는 원본 그대로, 색(a·b)만 레퍼런스를 따른다
+ *   (어두운 레퍼런스 때문에 사진까지 어두워지지 않게)
  */
 class ColorTransfer(
     private val source: ColorStats,
     private val reference: ColorStats,
     private val strength: Float = 1f,
+    private val keepLightness: Boolean = false,
 ) {
     val scale: DoubleArray = DoubleArray(3) { c ->
         if (source.std[c] < MIN_STD) 1.0 else (reference.std[c] / source.std[c]).coerceIn(MIN_SCALE, MAX_SCALE)
@@ -50,6 +53,7 @@ class ColorTransfer(
         if (strength <= 0f) return argb
         val lab = ColorLab.fromArgb(argb)
         val out = DoubleArray(3) { c ->
+            if (c == L && keepLightness) return@DoubleArray lab[c]
             val moved = (lab[c] - source.mean[c]) * scale[c] + reference.mean[c]
             lab[c] + strength * (moved - lab[c])
         }
@@ -60,5 +64,6 @@ class ColorTransfer(
         const val MIN_SCALE = 0.5
         const val MAX_SCALE = 2.0
         private const val MIN_STD = 1e-3
+        private const val L = 0
     }
 }

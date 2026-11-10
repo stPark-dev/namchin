@@ -29,11 +29,16 @@ object ColorMatcher {
     private const val TAG = "ColorMatcher"
     private const val MAX_WORKERS = 8
 
-    fun lut(context: Context, reference: Reference, shot: Uri): ColorLut {
+    /** @param keepLightness true면 밝기는 원본 그대로, 색만 레퍼런스를 따른다 */
+    fun lut(context: Context, reference: Reference, shot: Uri, keepLightness: Boolean): ColorLut {
         val refBitmap = BitmapFactory.decodeFile(reference.imagePath, BitmapFactory.Options().apply { inSampleSize = 4 })
             ?: throw IOException("레퍼런스 이미지를 읽지 못함: ${reference.imagePath}")
         val shotBitmap = BitmapLoader.load(context, shot, STATS_DIMENSION)
-        val transfer = ColorTransfer(ColorStats.of(pixels(shotBitmap)), ColorStats.of(pixels(refBitmap)))
+        val transfer = ColorTransfer(
+            ColorStats.of(pixels(shotBitmap)),
+            ColorStats.of(pixels(refBitmap)),
+            keepLightness = keepLightness,
+        )
         return ColorLut.build(transfer::apply)
     }
 

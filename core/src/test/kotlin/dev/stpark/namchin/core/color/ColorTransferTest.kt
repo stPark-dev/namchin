@@ -112,4 +112,29 @@ class ColorTransferTest {
         assertEquals(full, lut.apply(c, strength = 1f))
         assertTrue(abs(r(lut.apply(c, 0.5f)) - (r(c) + r(full)) / 2) <= 1)
     }
+
+    @Test
+    fun `keeping lightness changes the colour but not the brightness`() {
+        // 밝은 사진에 어둡고 푸른 레퍼런스: 색(푸른 기)만 가져오고 밝기는 그대로
+        val photo = image(200, 190, 180)
+        val darkBlue = image(40, 60, 110)
+        val transfer = ColorTransfer(ColorStats.of(photo), ColorStats.of(darkBlue), keepLightness = true)
+
+        photo.take(50).forEach { c ->
+            val before = ColorLab.fromArgb(c)
+            val after = ColorLab.fromArgb(transfer.apply(c))
+            // 8비트 RGB로 되돌릴 때 반올림·색 범위 밖 잘림만큼은 흔들린다 (사람 눈엔 같은 밝기)
+            assertEquals(before[0], after[0], 2.0, "L")
+            assertTrue(after[2] < before[2] - 5, "더 푸르게 (b 감소): ${before[2]} -> ${after[2]}")
+        }
+    }
+
+    @Test
+    fun `without keeping lightness a dark reference darkens the photo`() {
+        val photo = image(200, 190, 180)
+        val transfer = ColorTransfer(ColorStats.of(photo), ColorStats.of(image(40, 60, 110)))
+
+        val c = photo.first()
+        assertTrue(ColorLab.fromArgb(transfer.apply(c))[0] < ColorLab.fromArgb(c)[0] - 20)
+    }
 }
