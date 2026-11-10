@@ -1,33 +1,52 @@
 package dev.stpark.namchin.ui.camera
 
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Rational
+import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.camera.core.Camera
+import androidx.camera.core.ImageCapture
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,64 +55,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraViewModel
-import dev.stpark.namchin.camera.GuidanceText
+import dev.stpark.namchin.camera.CardOrder
 import dev.stpark.namchin.camera.ShutterGate
-import dev.stpark.namchin.camera.Feedback
-import dev.stpark.namchin.camera.GuideVoice
-import dev.stpark.namchin.camera.Haptics
-import dev.stpark.namchin.settings.AppSettingsStore
-import dev.stpark.namchin.ui.theme.Brand
-import dev.stpark.namchin.review.ReviewState
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
-import dev.stpark.namchin.core.tagging.Tag
-import dev.stpark.namchin.ml.SceneEmbedder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import dev.stpark.namchin.review.ReviewViewModel
-import dev.stpark.namchin.ui.review.ResultOverlay
-import dev.stpark.namchin.ui.theme.Jua
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.res.painterResource
-import androidx.lifecycle.LifecycleEventObserver
-import java.util.concurrent.atomic.AtomicBoolean
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.width
-import dev.stpark.namchin.camera.ZoomLogic
-import androidx.camera.core.Camera
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import dev.stpark.namchin.camera.tiltDegrees
-import dev.stpark.namchin.camera.angularSpeed
-import kotlinx.coroutines.launch
-import dev.stpark.namchin.core.framing.FramingAnalyzer
-import dev.stpark.namchin.core.guidance.Guidance
-import android.util.Rational
-import android.view.HapticFeedbackConstants
-import androidx.activity.compose.BackHandler
-import androidx.camera.core.ImageCapture
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.ui.platform.LocalView
 import dev.stpark.namchin.capture.PhotoSaver
+import dev.stpark.namchin.core.tagging.Tag
 import dev.stpark.namchin.data.Reference
+import dev.stpark.namchin.ml.SceneEmbedder
+import dev.stpark.namchin.review.ReviewState
+import dev.stpark.namchin.review.ReviewViewModel
+import dev.stpark.namchin.settings.AppSettingsStore
+import dev.stpark.namchin.ui.review.ResultOverlay
+import dev.stpark.namchin.ui.theme.Brand
+import dev.stpark.namchin.ui.theme.Jua
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import kotlin.math.abs
-
-private const val ANALYSIS_ASPECT = 3f / 4f
+import kotlinx.coroutines.withContext
 
 /**
  * 시작 화면. referenceId가 null이면 기본 모드, 있으면 레퍼런스 모드.
@@ -119,18 +95,21 @@ fun CameraScreen(
         if (granted) {
             CameraContent(referenceId, references, learnedTags, onSelectReference, onOpenLibrary, onOpenSettings)
         } else {
-            Column(
-                Modifier.fillMaxSize().padding(32.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Image(painterResource(R.drawable.brand_symbol_on_dark), null, Modifier.size(140.dp))
-                Text(stringResource(R.string.camera_permission_needed), color = Brand.Paper, fontFamily = Jua, fontSize = 18.sp)
-                Button(onClick = { request.launch(Manifest.permission.CAMERA) }) {
-                    Text(stringResource(R.string.camera_permission_grant))
-                }
-            }
+            PermissionRequest(onGrant = { request.launch(Manifest.permission.CAMERA) })
         }
+    }
+}
+
+@Composable
+private fun PermissionRequest(onGrant: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Image(painterResource(R.drawable.brand_symbol_on_dark), null, Modifier.size(140.dp))
+        Text(stringResource(R.string.camera_permission_needed), color = Brand.Paper, fontFamily = Jua, fontSize = 18.sp)
+        Button(onClick = onGrant) { Text(stringResource(R.string.camera_permission_grant)) }
     }
 }
 
@@ -145,7 +124,8 @@ private fun CameraContent(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    val appSettings by remember { AppSettingsStore.get(context) }.settings.collectAsStateWithLifecycle()
+    val settingsStore = remember { AppSettingsStore.get(context) }
+    val appSettings by settingsStore.settings.collectAsStateWithLifecycle()
     val all = references.orEmpty()
     val vm: CameraViewModel = viewModel()
     val reviewVm: ReviewViewModel = viewModel()
@@ -167,28 +147,17 @@ private fun CameraContent(
         camera?.cameraControl?.setZoomRatio(zoomRatio)
     }
 
-    val lifecycleOwner = LocalLifecycleOwner.current
     // 목록이 로드된 뒤 고른 레퍼런스로 시작 (id가 같으면 목록이 갱신돼도 다시 시작하지 않음)
     val loaded = references != null
     LaunchedEffect(referenceId, loaded) {
         if (referenceId == null || loaded) vm.start(references?.firstOrNull { it.id == referenceId })
     }
-    // 화면이 보일 때만 센서 사용
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            launch { angularSpeed(context).collect(vm::onGyro) }
-            tiltDegrees(context).collect(vm::onTilt)
-        }
-    }
+    SensorEffect(vm)
     val reference = state.reference
     LaunchedEffect(all) { vm.updateReferences(all) }
     // 장면 임베딩 모델을 미리 불러 첫 장면 분석이 늦지 않게
     LaunchedEffect(Unit) { withContext(Dispatchers.Default) { SceneEmbedder.get(context) } }
-    val orderedCards = remember(all, state.cardOrder) {
-        val order = state.cardOrder ?: return@remember all
-        val byId = all.associateBy { it.id }
-        order.mapNotNull { byId[it] } + all.filter { it.id !in order }
-    }
+    val orderedCards = remember(all, state.cardOrder) { CardOrder.arrange(all, state.cardOrder) { it.id } }
     LaunchedEffect(flash) { if (flash) { delay(FLASH_MS); flash = false } }
     LaunchedEffect(message) { if (message != null) { delay(MESSAGE_MS); message = null } }
     BackHandler(enabled = deckOpen) { deckOpen = false }
@@ -202,23 +171,7 @@ private fun CameraContent(
     // 카드 목록·결과 화면·크게 보기가 떠 있는 동안 자동 셔터를 멈춘다
     LaunchedEffect(deckOpen, reviewing, peek.active) { vm.pauseAutoShutter(deckOpen || reviewing || peek.active) }
 
-    // 화면을 떠나거나 백그라운드로 가면 진행 중인 연속 촬영을 멈춘다
-    val screenActive = remember { AtomicBoolean(true) }
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> screenActive.set(true)
-                Lifecycle.Event.ON_STOP -> screenActive.set(false)
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            screenActive.set(false)
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
+    val screenActive = rememberScreenActive()
     val canShoot = ShutterGate.canShoot(referenceId, reference?.id, imageCapture != null, capturing)
     fun shoot(count: Int) {
         if (reviewing) return
@@ -242,30 +195,13 @@ private fun CameraContent(
         }
     }
 
-    // 음성·진동·자동 셔터
-    val voice = remember { GuideVoice(context) }
-    val haptics = remember { Haptics(context) }
-    DisposableEffect(voice) { onDispose { voice.close() } }
-    LaunchedEffect(state.settings.voice) { if (!state.settings.voice) voice.stop() }
-    DisposableEffect(lifecycleOwner, voice) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) voice.stop() }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    val currentShoot by rememberUpdatedState(::shoot)
-    val currentCanShoot by rememberUpdatedState(canShoot && !deckOpen && !reviewing && !peek.active)
-    LaunchedEffect(vm) {
-        vm.feedback.collect { event ->
-            when (event) {
-                is Feedback.Speak -> voice.speak(GuidanceText.text(context, event.cue))
-                Feedback.Tick -> haptics.tick()
-                Feedback.AlignedBuzz -> haptics.aligned()
-                Feedback.Fire -> if (!currentCanShoot) vm.onFireRejected() else currentShoot(BURST_COUNT)
-            }
-        }
-    }
+    FeedbackEffect(
+        vm,
+        voiceOn = state.settings.voice,
+        canFire = canShoot && !deckOpen && !reviewing && !peek.active,
+        fire = { shoot(BURST_COUNT) },
+    )
 
-    val settingsStore = remember { AppSettingsStore.get(context) }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             // 상단: 적용 중 레퍼런스(왼쪽), 설정(오른쪽). 안내 문구는 미리보기 위 캡슐로
@@ -283,63 +219,22 @@ private fun CameraContent(
                     Icon(Icons.Rounded.Settings, stringResource(R.string.cd_settings), tint = Color.White)
                 }
             }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(ANALYSIS_ASPECT)
-                    .pointerInput(zoomRange) {
-                        val range = zoomRange ?: return@pointerInput
-                        detectTransformGestures { _, _, scale, _ ->
-                            setZoom(ZoomLogic.pinch(zoomRatio, scale, range.start, range.endInclusive))
-                        }
-                    },
-            ) {
-                CameraPreview(
-                    onFrame = vm::onFrame,
-                    onScene = vm::onSceneFrame,
-                    onExposure = vm::onExposure,
-                    onCameraReady = { cam, capture ->
-                        camera = cam
-                        imageCapture = capture
-                        cam.cameraControl.setZoomRatio(zoomRatio)
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
-                val region = state.region
-                if (region != null && appSettings.grid) GridOverlay(region, Modifier.fillMaxSize())
-                if (region != null) {
-                    if (reference != null) StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
-                    LiveSkeleton(state.current, region, state.output?.aligned == true, Modifier.fillMaxSize())
-                    ViewfinderCorners(region, aligned = state.output?.aligned == true, Modifier.fillMaxSize())
-                }
-                val roll = state.rollDegrees
-                val level = state.output?.let { out -> out.cues.none { it is Guidance.Level } }
-                    ?: (roll == null || abs(roll) <= FramingAnalyzer.LEVEL_TOLERANCE_DEG)
-                LevelIndicator(roll, level, Modifier.fillMaxSize())
-                GuidanceCapsule(
-                    state,
-                    // 위쪽 꺾쇠 사이 가운데 (꺾쇠·오른쪽 아이콘 줄과 겹치지 않게 양쪽 여백 동일)
-                    Modifier.align(Alignment.TopCenter).padding(top = 16.dp, start = 64.dp, end = 64.dp),
-                )
-                ControlRail(
-                    settings = state.settings,
-                    grid = appSettings.grid,
-                    showAutoShutter = reference?.pose != null,
-                    onChange = vm::updateSettings,
-                    onGrid = { settingsStore.update(appSettings.copy(grid = it)) },
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 10.dp),
-                )
-                zoomRange?.let { range ->
-                    ZoomCapsule(
-                        presets = ZoomLogic.presets(range.start, range.endInclusive),
-                        current = zoomRatio,
-                        onSelect = ::setZoom,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
-                    )
-                }
-                if (flash) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.7f)))
-                message?.let { Toast(stringResource(it), Modifier.align(Alignment.Center)) }
-            }
+            Viewfinder(
+                vm = vm,
+                state = state,
+                grid = appSettings.grid,
+                ghostAlpha = ghostAlpha,
+                zoom = ZoomState(zoomRatio, zoomRange),
+                onZoom = ::setZoom,
+                onGrid = { settingsStore.update(appSettings.copy(grid = it)) },
+                onCameraReady = { cam, capture ->
+                    camera = cam
+                    imageCapture = capture
+                    cam.cameraControl.setZoomRatio(zoomRatio)
+                },
+                flash = flash,
+                message = message,
+            )
             if (reference != null) {
                 GhostSlider(
                     alpha = ghostAlpha,
@@ -347,43 +242,21 @@ private fun CameraContent(
                     modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
                 )
             }
-            // 셔터 줄: 카드 손패는 이 칸 안의 오른쪽에만 둬서 다른 버튼 터치를 가로채지 않는다
-            Box(Modifier.fillMaxWidth().weight(1f)) {
-                ShutterBar(
-                    latestReference = all.firstOrNull(),
-                    enabled = canShoot && !reviewing,
-                    onShutter = { shoot(1) },
-                    onLongShutter = { shoot(BURST_COUNT) },
-                    onOpenLibrary = onOpenLibrary,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                if (appSettings.debugInfo) {
-                    Text(
-                        stringResource(
-                            R.string.camera_stats,
-                            state.analysisMs.toInt(),
-                            state.fps,
-                            state.output?.match?.let { "%.2f".format(it.score) } ?: "-",
-                            state.brightness,
-                            state.exposure ?: 0f,
-                        ),
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 10.sp,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 4.dp),
-                    )
-                }
-                CardHand(
-                    // 지금 장면과 배경이 비슷한 레퍼런스가 앞으로
-                    references = orderedCards.filter { it.id != referenceId },
-                    onExpand = { deckOpen = true },
-                    modifier = Modifier.align(Alignment.BottomEnd).width(150.dp).fillMaxHeight(),
-                    peekingId = peek.reference?.id,
-                    onPeekOpen = peek::openFrom,
-                    onPeekStart = peek::start,
-                    onPeekDrag = { peek.dragBy(it, peekDistancePx) },
-                    onPeekEnd = peek::release,
-                )
-            }
+            BottomBar(
+                state = state,
+                latestReference = all.firstOrNull(),
+                // 지금 장면과 배경이 비슷한 레퍼런스가 앞으로
+                cards = orderedCards.filter { it.id != referenceId },
+                shutterEnabled = canShoot && !reviewing,
+                debugInfo = appSettings.debugInfo,
+                peek = peek,
+                peekDistancePx = peekDistancePx,
+                onShutter = { shoot(1) },
+                onLongShutter = { shoot(BURST_COUNT) },
+                onOpenLibrary = onOpenLibrary,
+                onExpandCards = { deckOpen = true },
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
         }
         PeekOverlay(
             state = peek,
