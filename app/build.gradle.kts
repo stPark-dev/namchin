@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.mlkit.pose.accurate)
+    implementation(libs.mlkit.face)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
     implementation(libs.camerax.core)

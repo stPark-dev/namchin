@@ -43,6 +43,9 @@ import dev.stpark.namchin.camera.GuideVoice
 import dev.stpark.namchin.camera.Haptics
 import dev.stpark.namchin.settings.AppSettingsStore
 import dev.stpark.namchin.ui.theme.Brand
+import dev.stpark.namchin.review.ReviewState
+import dev.stpark.namchin.review.ReviewViewModel
+import dev.stpark.namchin.ui.review.ResultOverlay
 import dev.stpark.namchin.ui.theme.Jua
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.Icons
@@ -132,6 +135,9 @@ private fun CameraContent(
     val appSettings by remember { AppSettingsStore.get(context) }.settings.collectAsStateWithLifecycle()
     val all = references.orEmpty()
     val vm: CameraViewModel = viewModel()
+    val reviewVm: ReviewViewModel = viewModel()
+    val review by reviewVm.state.collectAsStateWithLifecycle()
+    val reviewing = review != ReviewState.Hidden
     val state by vm.state.collectAsStateWithLifecycle()
     var ghostAlpha by rememberSaveable { mutableFloatStateOf(0.35f) }
     var camera by remember { mutableStateOf<Camera?>(null) }
@@ -162,7 +168,9 @@ private fun CameraContent(
     LaunchedEffect(flash) { if (flash) { delay(FLASH_MS); flash = false } }
     LaunchedEffect(message) { if (message != null) { delay(MESSAGE_MS); message = null } }
     BackHandler(enabled = deckOpen) { deckOpen = false }
-    LaunchedEffect(deckOpen) { vm.pauseAutoShutter(deckOpen) }
+    BackHandler(enabled = reviewing) { reviewVm.close() }
+    // 카드 목록이나 결과 화면이 떠 있는 동안 자동 셔터를 멈춘다
+    LaunchedEffect(deckOpen, reviewing) { vm.pauseAutoShutter(deckOpen || reviewing) }
 
     // 화면을 떠나거나 백그라운드로 가면 진행 중인 연속 촬영을 멈춘다
     val screenActive = remember { AtomicBoolean(true) }
@@ -193,10 +201,12 @@ private fun CameraContent(
         if (state.settings.vibrate) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         PhotoSaver.takeBurst(context, capture, count, appSettings.shutterSound, isActive = { screenActive.get() }) { saved ->
             capturing = false
-            message = when {
-                saved == 0 -> R.string.camera_save_failed
-                saved > 1 -> R.string.camera_saved_burst
-                else -> R.string.camera_saved
+            when {
+                saved.isEmpty() -> message = R.string.camera_save_failed
+                // 여러 장이면 베스트 컷 결과 화면
+                saved.size > 1 && screenActive.get() -> reviewVm.review(saved, reference)
+                saved.size > 1 -> message = R.string.camera_saved_burst
+                else -> message = R.string.camera_saved
             }
         }
     }
@@ -212,7 +222,7 @@ private fun CameraContent(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val currentShoot by rememberUpdatedState(::shoot)
-    val currentCanShoot by rememberUpdatedState(canShoot && !deckOpen)
+    val currentCanShoot by rememberUpdatedState(canShoot && !deckOpen && !reviewing)
     LaunchedEffect(vm) {
         vm.feedback.collect { event ->
             when (event) {
@@ -306,6 +316,7 @@ private fun CameraContent(
                     latestReference = all.firstOrNull(),
                     enabled = canShoot,
                     onShutter = { shoot(1) },
+                    onLongShutter = { shoot(BURST_COUNT) },
                     onOpenLibrary = onOpenLibrary,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -330,6 +341,11 @@ private fun CameraContent(
                 )
             }
         }
+        ResultOverlay(
+            state = review,
+            onKeepBest = { reviewVm.keepBestOnly { message = R.string.review_kept_best } },
+            onClose = reviewVm::close,
+        )
         if (deckOpen) {
             CardDeck(
                 references = all,

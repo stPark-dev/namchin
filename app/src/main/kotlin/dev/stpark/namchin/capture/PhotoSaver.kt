@@ -18,7 +18,7 @@ object PhotoSaver {
 
     /**
      * count장을 차례로 찍는다. playSound면 각 장마다 셔터음.
-     * 실패하거나 isActive()가 false가 되면(화면 이탈) 멈춘다. 결과는 저장된 장 수.
+     * 실패하거나 isActive()가 false가 되면(화면 이탈) 멈춘다. 결과는 저장된 사진 주소들.
      */
     fun takeBurst(
         context: Context,
@@ -26,8 +26,8 @@ object PhotoSaver {
         count: Int,
         playSound: Boolean,
         isActive: () -> Boolean,
-        onDone: (saved: Int) -> Unit,
-    ) = Burst.run(count, isActive, { done -> take(context, capture, playSound) { uri -> done(uri != null) } }, onDone)
+        onDone: (saved: List<Uri>) -> Unit,
+    ) = Burst.run(count, isActive, { done -> take(context, capture, playSound, done) }, onDone)
 
     /** @param playSound 설정 화면의 셔터음 켬/끔 */
     fun take(context: Context, capture: ImageCapture, playSound: Boolean, onResult: (Uri?) -> Unit) {

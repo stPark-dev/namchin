@@ -97,4 +97,14 @@
     <string name="cd_clear_reference">레퍼런스 해제</string>
     <string name="cd_close">닫기</string>
     <string name="cd_delete">삭제</string>
+
+    <string name="review_title">베스트 컷</string>
+    <string name="review_analyzing">베스트 컷을 고르는 중…</string>
+    <string name="review_compare">레퍼런스와 비교</string>
+    <string name="review_keep_all">모두 두기</string>
+    <string name="review_keep_best">베스트만 남기기</string>
+    <string name="review_eyes_closed">눈 감음</string>
+    <string name="review_best">베스트</string>
+    <string name="review_kept_best">베스트 컷만 남겼어요</string>
+    <string name="review_reference">레퍼런스</string>
 </resources>

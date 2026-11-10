@@ -15,13 +15,13 @@ object BitmapLoader {
     const val LUMA_GRID_WIDTH = 180
 
     /** EXIF 회전이 적용된 소프트웨어 비트맵 (픽셀 접근 가능). */
-    fun load(context: Context, uri: Uri): Bitmap {
+    fun load(context: Context, uri: Uri, maxDimension: Int = MAX_DIMENSION): Bitmap {
         val source = ImageDecoder.createSource(context.contentResolver, uri)
         return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             val longest = maxOf(info.size.width, info.size.height)
-            if (longest > MAX_DIMENSION) {
-                val scale = MAX_DIMENSION.toFloat() / longest
+            if (longest > maxDimension) {
+                val scale = maxDimension.toFloat() / longest
                 decoder.setTargetSize(
                     (info.size.width * scale).roundToInt(),
                     (info.size.height * scale).roundToInt(),
@@ -31,8 +31,7 @@ object BitmapLoader {
     }
 
     /** 자동 크롭 검출용 축소 흑백 이미지 (원본 비율 유지). */
-    fun toLuma(bitmap: Bitmap): LumaImage {
-        val width = LUMA_GRID_WIDTH
+    fun toLuma(bitmap: Bitmap, width: Int = LUMA_GRID_WIDTH): LumaImage {
         val height = maxOf(1, (bitmap.height * width / bitmap.width.toFloat()).roundToInt())
         val small = Bitmap.createScaledBitmap(bitmap, width, height, true)
         val pixels = IntArray(width * height)

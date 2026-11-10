@@ -30,6 +30,7 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+mlkit-face = { module = "com.google.mlkit:face-detection", version = "16.1.7" }
 mlkit-pose-accurate = { module = "com.google.mlkit:pose-detection-accurate", version.ref = "mlkitPose" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 camerax-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }

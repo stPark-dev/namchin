@@ -2,6 +2,7 @@ package dev.stpark.namchin.ui.camera
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +33,7 @@ fun ShutterBar(
     latestReference: Reference?,
     enabled: Boolean,
     onShutter: () -> Unit,
+    onLongShutter: () -> Unit,
     onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -59,7 +61,8 @@ fun ShutterBar(
                 .align(Alignment.Center)
                 .size(80.dp)
                 .clip(CircleShape)
-                .clickable(enabled = enabled, onClick = onShutter)
+                // 탭 = 한 장, 길게 누르기 = 연속 촬영
+                .combinedClickable(enabled = enabled, onClick = onShutter, onLongClick = onLongShutter)
                 .semantics { contentDescription = shutterLabel },
         )
     }
