@@ -22,6 +22,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import androidx.lifecycle.viewModelScope
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 
 /**
  * @property region 분석 프레임 안에서 레퍼런스 비율로 실제 찍힐 영역
@@ -60,7 +65,8 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         live = LiveState()
         lastFrameAt = 0L
         wasAligned = false
-        _state.value = CameraUiState(reference = reference, settings = _state.value.settings)
+        // 카드를 바꿔도 장면 기준 카드 순서는 유지 (다음 장면 분석까지 원래 순서로 튀지 않게)
+        _state.value = CameraUiState(reference = reference, settings = _state.value.settings, cardOrder = _state.value.cardOrder)
     }
 
     fun updateSettings(settings: FeedbackSettings) = _state.update { it.copy(settings = settings) }
@@ -72,12 +78,24 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         references = list
     }
 
-    /** 분석 스레드에서 2초마다 호출: 장면 임베딩 → 비슷한 순서로 카드 정렬. */
+    private val sceneBusy = AtomicBoolean(false)
+
+    /**
+     * 분석 스레드에서 2초마다 호출. 임베딩은 별도 스레드에서 해 포즈 분석을 막지 않는다.
+     * 앞 계산이 아직이면 이번 프레임은 버린다 (최신 장면만 중요).
+     */
     fun onSceneFrame(bitmap: Bitmap) {
-        val query = SceneEmbedder.get(getApplication()).embed(bitmap) ?: return
-        val order = SceneRanking.rank(query, references.map { it.id to it.embedding }, previousTop)
-        previousTop = order.firstOrNull()
-        _state.update { it.copy(cardOrder = order) }
+        if (!sceneBusy.compareAndSet(false, true)) return
+        viewModelScope.launch(sceneDispatcher) {
+            try {
+                val query = SceneEmbedder.get(getApplication()).embed(bitmap) ?: return@launch
+                val order = SceneRanking.rank(query, references.map { it.id to it.embedding }, previousTop)
+                previousTop = order.firstOrNull()
+                _state.update { it.copy(cardOrder = order) }
+            } finally {
+                sceneBusy.set(false)
+            }
+        }
     }
 
     /** 카드 목록이 열려 있는 동안 등 자동 셔터를 잠시 멈춘다. */
@@ -142,6 +160,9 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
+        /** 장면 계산은 한 줄로 (previousTop을 한 스레드에서만 다루도록) */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val sceneDispatcher = Dispatchers.Default.limitedParallelism(1)
         const val FPS_SMOOTHING = 0.9f
         const val FEEDBACK_BUFFER = 8
     }

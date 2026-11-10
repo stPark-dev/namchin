@@ -12,6 +12,7 @@ import dev.stpark.namchin.core.tagging.TaggedExample
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.model.PoseCodec
 import dev.stpark.namchin.core.reference.ReferenceProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
@@ -35,15 +36,18 @@ data class Reference(
     val aspectRatio: Float get() = width.toFloat() / height
     val profile: ReferenceProfile by lazy { ReferenceProfile.of(pose) }
 
-    /**
-     * 화면에 보여줄 태그: 확정했으면 그대로, 아니면 자동 태그 + 확정된 비슷한 레퍼런스에게서 배운 장소·계절.
-     */
-    fun displayTags(all: List<Reference>): Set<Tag> = if (tagsConfirmed) {
-        tags
-    } else {
-        val examples = all.filter { it.tagsConfirmed && it.id != id && it.embedding != null }
-            .map { TaggedExample(it.embedding!!, it.tags) }
-        TagSuggestion.suggest(tags, embedding, examples)
+    /** 확정 전이면, 확정된 비슷한 레퍼런스에게서 배운 장소·계절 제안 (내 태그 제외). */
+    fun learnedTags(examples: List<TaggedExample>): Set<Tag> =
+        if (tagsConfirmed) emptySet() else TagSuggestion.suggest(tags, embedding, examples) - tags
+
+    companion object {
+        /** 레퍼런스별 배운 제안. 목록이 바뀔 때 한 번만 계산한다. */
+        fun learnedTagsById(all: List<Reference>): Map<Long, Set<Tag>> {
+            val confirmed = all.filter { it.tagsConfirmed && it.embedding != null }
+            return all.associate { ref ->
+                ref.id to ref.learnedTags(confirmed.filter { it.id != ref.id }.map { TaggedExample(it.embedding!!, it.tags) })
+            }
+        }
     }
 }
 
@@ -90,11 +94,14 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
     /** 임베딩이 없는 레퍼런스(이전 버전에서 저장한 것)를 채운다. 채운 개수를 돌려준다. */
     suspend fun backfillEmbeddings(embed: (Bitmap) -> Embedding?): Int = withContext(Dispatchers.IO) {
         dao.withoutEmbedding().count { entity ->
-            val bitmap = BitmapFactory.decodeFile(entity.imagePath, BitmapFactory.Options().apply { inSampleSize = 4 })
-                ?: return@count false
-            val embedding = embed(bitmap) ?: return@count false
-            dao.updateEmbedding(entity.id, EmbeddingCodec.encode(embedding))
-            true
+            // 한 장이 실패해도 나머지는 계속
+            runCatching {
+                val bitmap = BitmapFactory.decodeFile(entity.imagePath, BitmapFactory.Options().apply { inSampleSize = 4 })
+                    ?: return@runCatching false
+                val embedding = embed(bitmap) ?: return@runCatching false
+                dao.updateEmbedding(entity.id, EmbeddingCodec.encode(embedding))
+                true
+            }.getOrDefault(false)
         }
     }
 
@@ -102,12 +109,18 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
     suspend fun backfillTags(autoTag: suspend (Bitmap, PersonPose?) -> Set<Tag>): Int {
         val missing = withContext(Dispatchers.IO) { dao.withoutTags() }
         return missing.count { entity ->
-            val bitmap = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeFile(entity.imagePath, BitmapFactory.Options().apply { inSampleSize = 2 })
-            } ?: return@count false
-            val tags = autoTag(bitmap, entity.pose?.let(PoseCodec::decode))
-            withContext(Dispatchers.IO) { dao.updateTags(entity.id, TagCodec.encode(tags), false) }
-            true
+            try {
+                val bitmap = withContext(Dispatchers.IO) {
+                    BitmapFactory.decodeFile(entity.imagePath, BitmapFactory.Options().apply { inSampleSize = 2 })
+                } ?: return@count false
+                val tags = autoTag(bitmap, entity.pose?.let(PoseCodec::decode))
+                withContext(Dispatchers.IO) { dao.fillAutoTags(entity.id, TagCodec.encode(tags)) }
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                false
+            }
         }
     }
 

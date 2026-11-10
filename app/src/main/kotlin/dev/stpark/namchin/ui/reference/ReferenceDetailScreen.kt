@@ -40,7 +40,7 @@ import dev.stpark.namchin.ui.common.ReferenceImage
 @Composable
 fun ReferenceDetailScreen(
     reference: Reference,
-    allReferences: List<Reference>,
+    learnedTags: Set<Tag>,
     onConfirmTags: (Set<Tag>) -> Unit,
     onShoot: () -> Unit,
     onDelete: () -> Unit,
@@ -70,7 +70,9 @@ fun ReferenceDetailScreen(
         ) {
             ReferenceImage(reference, Modifier.fillMaxWidth())
             TagEditor(
-                tags = reference.displayTags(allReferences),
+                referenceId = reference.id,
+                own = reference.tags,
+                learned = learnedTags,
                 confirmed = reference.tagsConfirmed,
                 onConfirm = onConfirmTags,
             )

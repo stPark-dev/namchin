@@ -42,6 +42,7 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
     var cameraReferenceId by rememberSaveable { mutableStateOf<Long?>(null) }
     val referencesVm: ReferencesViewModel = viewModel()
     val references by referencesVm.references.collectAsStateWithLifecycle()
+    val learnedTags by referencesVm.learnedTags.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
         uri?.let { screen = Screen.Import.new(it.toString()) }
     }
@@ -74,6 +75,7 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
                 CameraScreen(
                     referenceId = s.referenceId,
                     references = references,
+                    learnedTags = learnedTags,
                     onSelectReference = ::toCamera,
                     onOpenLibrary = { screen = Screen.Library },
                     onOpenSettings = { screen = Screen.Settings },
@@ -105,7 +107,7 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
                 if (reference != null) {
                     ReferenceDetailScreen(
                         reference = reference,
-                        allReferences = loaded,
+                        learnedTags = learnedTags[s.id].orEmpty(),
                         onConfirmTags = { referencesVm.confirmTags(s.id, it) },
                         onShoot = { toCamera(s.id) },
                         onDelete = {

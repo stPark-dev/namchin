@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import dev.stpark.namchin.data.Reference
 import dev.stpark.namchin.data.ReferenceRepository
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -17,6 +19,12 @@ import kotlinx.coroutines.Dispatchers
 
 class ReferencesViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = ReferenceRepository.get(app)
+
+    /** 레퍼런스별 배운 태그 제안 (목록이 바뀔 때 백그라운드에서 한 번 계산). */
+    val learnedTags: StateFlow<Map<Long, Set<Tag>>> = repository.observeAll()
+        .map { Reference.learnedTagsById(it) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
 
     /** null = 아직 로딩 중. */
     val references: StateFlow<List<Reference>?> = repository.observeAll()

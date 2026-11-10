@@ -66,4 +66,20 @@ class AutoTagsTest {
         assertEquals(all.size, all.toSet().size)
         assertTrue(TagVocabulary.LABEL_TO_TAG.values.all { it in all })
     }
+
+    @Test
+    fun `knees guessed outside the frame do not count`() {
+        // 허리 아래가 잘린 사진: ML Kit가 화면 밖 무릎을 추정해도 상반신으로 본다
+        val cut = STANDING.filterKeys { "ANKLE" !in it.name }.with(
+            Joint.LEFT_KNEE to Point(0.53f, 1.2f),
+            Joint.RIGHT_KNEE to Point(0.47f, 1.2f),
+        )
+
+        assertEquals(setOf(upper), AutoTags.framing(pose(cut)))
+    }
+
+    @Test
+    fun `a dim indoor scene is not night`() {
+        assertEquals(TagVocabulary.DAY, AutoTags.time(LumaImage(2, 2, IntArray(4) { 60 })))
+    }
 }

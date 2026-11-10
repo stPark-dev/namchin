@@ -44,6 +44,10 @@ import dev.stpark.namchin.camera.Haptics
 import dev.stpark.namchin.settings.AppSettingsStore
 import dev.stpark.namchin.ui.theme.Brand
 import dev.stpark.namchin.review.ReviewState
+import dev.stpark.namchin.core.tagging.Tag
+import dev.stpark.namchin.ml.SceneEmbedder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.stpark.namchin.review.ReviewViewModel
 import dev.stpark.namchin.ui.review.ResultOverlay
 import dev.stpark.namchin.ui.theme.Jua
@@ -92,6 +96,7 @@ private const val ANALYSIS_ASPECT = 3f / 4f
 fun CameraScreen(
     referenceId: Long?,
     references: List<Reference>?,
+    learnedTags: Map<Long, Set<Tag>>,
     onSelectReference: (Long?) -> Unit,
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -105,7 +110,7 @@ fun CameraScreen(
 
     Box(Modifier.fillMaxSize().background(Brand.Ink).safeDrawingPadding()) {
         if (granted) {
-            CameraContent(referenceId, references, onSelectReference, onOpenLibrary, onOpenSettings)
+            CameraContent(referenceId, references, learnedTags, onSelectReference, onOpenLibrary, onOpenSettings)
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -126,6 +131,7 @@ fun CameraScreen(
 private fun CameraContent(
     referenceId: Long?,
     references: List<Reference>?,
+    learnedTags: Map<Long, Set<Tag>>,
     onSelectReference: (Long?) -> Unit,
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -166,6 +172,8 @@ private fun CameraContent(
     }
     val reference = state.reference
     LaunchedEffect(all) { vm.updateReferences(all) }
+    // 장면 임베딩 모델을 미리 불러 첫 장면 분석이 늦지 않게
+    LaunchedEffect(Unit) { withContext(Dispatchers.Default) { SceneEmbedder.get(context) } }
     val orderedCards = remember(all, state.cardOrder) {
         val order = state.cardOrder ?: return@remember all
         val byId = all.associateBy { it.id }
@@ -362,6 +370,7 @@ private fun CameraContent(
         if (deckOpen) {
             CardDeck(
                 references = all,
+                learnedTags = learnedTags,
                 onSelect = {
                     deckOpen = false
                     onSelectReference(it.id)

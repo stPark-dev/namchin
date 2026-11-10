@@ -4,8 +4,12 @@ import kotlin.math.sqrt
 
 data class Tag(val name: String)
 
-/** 이미지 임베딩 벡터. */
+/** 이미지 임베딩 벡터. 값이 같으면 같은 임베딩 (배열 내용 비교). */
 class Embedding(val values: FloatArray) {
+    override fun equals(other: Any?): Boolean = other is Embedding && values.contentEquals(other.values)
+
+    override fun hashCode(): Int = values.contentHashCode()
+
     fun cosine(other: Embedding): Float {
         require(values.size == other.values.size) { "임베딩 차원 불일치: ${values.size} vs ${other.values.size}" }
         var dot = 0.0

@@ -86,4 +86,19 @@ class TagInferenceTest {
 
         assertEquals(setOf(autumn), TagInference.suggest(emb(1f, 0f), examples, emptySet(), mapping))
     }
+
+    @Test
+    fun `embeddings with the same values are equal`() {
+        assertEquals(emb(1f, 2f), emb(1f, 2f))
+        assertEquals(emb(1f, 2f).hashCode(), emb(1f, 2f).hashCode())
+    }
+
+    @Test
+    fun `neighbour threshold sits at 0_35`() {
+        fun at(sim: Float) = Embedding(floatArrayOf(sim, kotlin.math.sqrt(1 - sim * sim)))
+        val query = emb(1f, 0f)
+
+        assertEquals(setOf(autumn), TagInference.suggest(query, listOf(TaggedExample(at(0.36f), setOf(autumn))), emptySet(), mapping))
+        assertEquals(emptySet<Tag>(), TagInference.suggest(query, listOf(TaggedExample(at(0.34f), setOf(autumn))), emptySet(), mapping))
+    }
 }

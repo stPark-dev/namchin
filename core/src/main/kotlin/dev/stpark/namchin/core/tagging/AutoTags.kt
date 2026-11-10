@@ -9,16 +9,17 @@ import kotlin.math.abs
 object AutoTags {
     private const val MIN_CONFIDENCE = 0.5f
 
-    /** 평균 밝기가 이보다 낮으면 야경. */
-    const val NIGHT_LUMA = 70.0
+    /** 평균 밝기가 이보다 낮으면 야경. 어두운 실내 카페(약 60)를 야경으로 잘못 보지 않게 낮게 잡는다. */
+    const val NIGHT_LUMA = 50.0
 
     /** 허벅지가 수직에서 이 비율 이상 누우면 앉은 자세 (|가로| > 비율 × |세로|, 약 50도). */
     private const val SEATED_RATIO = 1.2f
 
     fun framing(pose: PersonPose?): Set<Tag> {
         if (pose == null) return emptySet()
-        fun at(joint: Joint) = pose.reliable(joint, MIN_CONFIDENCE)
-        val ankles = listOfNotNull(at(Joint.LEFT_ANKLE), at(Joint.RIGHT_ANKLE)).filter { it.x in 0f..1f && it.y in 0f..1f }
+        // 화면 밖으로 추정된 관절은 없는 것으로 본다 (허리 아래가 잘린 사진 등)
+        fun at(joint: Joint) = pose.reliable(joint, MIN_CONFIDENCE)?.takeIf { it.x in 0f..1f && it.y in 0f..1f }
+        val ankles = listOfNotNull(at(Joint.LEFT_ANKLE), at(Joint.RIGHT_ANKLE))
         val knees = listOfNotNull(at(Joint.LEFT_KNEE), at(Joint.RIGHT_KNEE))
         val shoulders = listOfNotNull(at(Joint.LEFT_SHOULDER), at(Joint.RIGHT_SHOULDER))
         val seated = listOf(Joint.LEFT_HIP to Joint.LEFT_KNEE, Joint.RIGHT_HIP to Joint.RIGHT_KNEE).any { (h, k) ->

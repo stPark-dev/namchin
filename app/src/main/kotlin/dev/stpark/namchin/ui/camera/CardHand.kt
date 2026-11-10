@@ -128,6 +128,7 @@ fun CardHand(
 @Composable
 fun CardDeck(
     references: List<Reference>,
+    learnedTags: Map<Long, Set<Tag>>,
     onSelect: (Reference) -> Unit,
     onClose: () -> Unit,
     onAddReference: () -> Unit,
@@ -162,12 +163,18 @@ fun CardDeck(
                 }
             } else {
                 // 태그 필터: 레퍼런스들에 실제로 있는 태그만
-                val available = remember(references) {
-                    val present = references.flatMap { it.displayTags(references) }.toSet()
+                // 내 태그 + 배운 제안 (목록이 바뀔 때만 다시 계산)
+                val tagsById = remember(references, learnedTags) {
+                    references.associate { it.id to (it.tags + learnedTags[it.id].orEmpty()) }
+                }
+                val available = remember(tagsById) {
+                    val present = tagsById.values.flatten().toSet()
                     TagVocabulary.CATEGORIES.flatMap { it.tags }.filter { it in present }
                 }
                 var filter by remember { mutableStateOf<Tag?>(null) }
-                val shown = filter?.let { f -> references.filter { f in it.displayTags(references) } } ?: references
+                val shown = remember(references, tagsById, filter) {
+                    filter?.let { f -> references.filter { f in tagsById[it.id].orEmpty() } } ?: references
+                }
                 LazyRow(
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp),
