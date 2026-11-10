@@ -10,6 +10,7 @@ import dev.stpark.namchin.core.model.BodyPart
 object GuidanceText {
     @StringRes
     fun of(cue: Guidance): Int = when (cue) {
+        Guidance.HoldSteady -> R.string.guide_hold_steady
         Guidance.NoPerson -> R.string.guide_no_person
         is Guidance.Level -> when (cue.rotation) {
             Rotation.CLOCKWISE -> R.string.guide_level_cw

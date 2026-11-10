@@ -8,6 +8,8 @@ import dev.stpark.namchin.core.live.LiveGuidance
 import dev.stpark.namchin.core.live.LiveInput
 import dev.stpark.namchin.core.live.LiveOutput
 import dev.stpark.namchin.core.live.LiveState
+import dev.stpark.namchin.core.live.LowLight
+import dev.stpark.namchin.core.live.Shake
 import dev.stpark.namchin.core.live.Region
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.data.Reference
@@ -43,6 +45,8 @@ data class CameraUiState(
     val settings: FeedbackSettings = FeedbackSettings(),
     /** 지금 장면과 비슷한 순서의 레퍼런스 id. null이면 원래 순서 */
     val cardOrder: List<Long>? = null,
+    /** 어두움(야간): 포즈 비교·자동 셔터 꺼짐 */
+    val lowLight: Boolean = false,
 )
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
@@ -51,6 +55,8 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     private var live = LiveState()
     private var lastFrameAt = 0L
     private var wasAligned = false
+    private var lowLight = LowLight.State()
+    private var shake = Shake.State()
     private val _feedback = MutableSharedFlow<Feedback>(extraBufferCapacity = FEEDBACK_BUFFER)
 
     /** 말하기·진동·자동 셔터 이벤트 (한 번씩만 처리). */
@@ -116,6 +122,10 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onTilt(degrees: Float?) = _state.update { it.copy(rollDegrees = degrees) }
 
+    fun onGyro(angularSpeed: Float) {
+        shake = Shake.step(shake, angularSpeed)
+    }
+
     fun onFrame(frame: PoseFrame) {
         val snapshot = _state.value
         val reference = snapshot.reference
@@ -126,14 +136,18 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             .let { if (it == snapshot.region) snapshot.region else it }
         val current = MlKitPoseMapper.toPersonPose(frame.landmarks, frame.width, frame.height)
             ?.let { CropRegion.remap(it, region) }
+        lowLight = LowLight.step(lowLight, frame.brightness, now)
+        val dark = lowLight.lowLight
         val refPose = reference?.pose
         val (next, output) = when {
-            reference == null -> LiveGuidance.stepBasic(live, current, snapshot.rollDegrees, now)
+            reference == null -> LiveGuidance.stepBasic(live, current, snapshot.rollDegrees, now, dark, shake.shaky)
             refPose != null -> LiveGuidance.step(
                 live,
                 LiveInput(
                     refPose, current, snapshot.rollDegrees, poseEnabled = true, nowMs = now,
                     autoShutter = snapshot.settings.autoShutter && !autoShutterPaused,
+                    lowLight = dark,
+                    shaky = shake.shaky,
                 ),
             )
             else -> live to null
@@ -151,6 +165,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         _state.update {
             it.copy(
                 region = region,
+                lowLight = dark,
                 current = current,
                 output = output,
                 analysisMs = frame.analysisMs,

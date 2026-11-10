@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.GridOff
 import androidx.compose.material.icons.rounded.MobileOff
 import androidx.compose.material.icons.rounded.MotionPhotosAuto
 import androidx.compose.material.icons.rounded.MotionPhotosOff
+import androidx.compose.material.icons.rounded.NightsStay
 import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.Icon
@@ -194,6 +195,23 @@ fun GhostSlider(alpha: Float, onChange: (Float) -> Unit, modifier: Modifier = Mo
             ),
             modifier = Modifier.padding(start = 12.dp).width(220.dp),
         )
+    }
+}
+
+/** 어두운 곳: 포즈 비교·자동 셔터가 꺼졌음을 알리는 배지. */
+@Composable
+fun NightBadge(modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(Glass)
+            .border(1.dp, GlassBorder, RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(Icons.Rounded.NightsStay, null, tint = Brand.Yellow, modifier = Modifier.size(16.dp))
+        Text(stringResource(R.string.camera_night), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
 

@@ -19,6 +19,8 @@ import dev.stpark.namchin.core.shutter.ShutterState
  * @property rollDegrees 폰 기울기 (시계 방향 양수). 알 수 없으면 null
  * @property poseEnabled false면 포즈 비교 생략 (야경 등)
  * @property autoShutter 자동 셔터 사용 여부
+ * @property lowLight 어두움(야간): 골격 인식이 부정확하므로 포즈 비교와 자동 셔터를 끈다
+ * @property shaky 손떨림. 어두울 때만 안내한다
  */
 data class LiveInput(
     val reference: PersonPose,
@@ -27,6 +29,8 @@ data class LiveInput(
     val poseEnabled: Boolean,
     val nowMs: Long,
     val autoShutter: Boolean = false,
+    val lowLight: Boolean = false,
+    val shaky: Boolean = false,
 )
 
 /** 프레임 사이에 이어지는 상태. */
@@ -65,15 +69,27 @@ object LiveGuidance {
      * 기본 모드(레퍼런스 없음): 수평 + 일반 구도 규칙.
      * 풍경만 찍을 수도 있으니 인물이 없어도 재촉하지 않는다. 자동 셔터가 없으므로 aligned는 항상 false.
      */
-    fun stepBasic(state: LiveState, current: PersonPose?, rollDegrees: Float?, nowMs: Long): Pair<LiveState, LiveOutput> {
-        val cues = listOfNotNull(rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) }) +
+    fun stepBasic(
+        state: LiveState,
+        current: PersonPose?,
+        rollDegrees: Float?,
+        nowMs: Long,
+        lowLight: Boolean = false,
+        shaky: Boolean = false,
+    ): Pair<LiveState, LiveOutput> {
+        val cues = holdSteady(lowLight, shaky) +
+            listOfNotNull(rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) }) +
             (current?.let { CompositionAnalyzer.analyze(it, state.previousCues) } ?: emptyList())
         val decision = GuidancePrioritizer.decide(cues, state.guidance, nowMs)
         val nextState = state.copy(previousCues = cues, guidance = decision.state)
         return nextState to LiveOutput(decision.display, cues, decision.announce, aligned = false, match = null)
     }
 
+    private fun holdSteady(lowLight: Boolean, shaky: Boolean) =
+        if (lowLight && shaky) listOf(Guidance.HoldSteady) else emptyList()
+
     fun step(state: LiveState, input: LiveInput): Pair<LiveState, LiveOutput> {
+        val poseEnabled = input.poseEnabled && !input.lowLight
         val referenceFrame = PersonFrame.from(input.reference)
         val currentFrame = input.current?.let(PersonFrame::from)
         val levelCue = input.rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) }
@@ -83,15 +99,16 @@ object LiveGuidance {
             else -> FramingAnalyzer.analyze(referenceFrame, currentFrame, input.rollDegrees, state.previousCues)
         }
         val match = input.current
-            ?.takeIf { input.poseEnabled }
+            ?.takeIf { poseEnabled }
             ?.let { PoseSimilarity.compare(input.reference, it, state.preferMirrored) }
-        val alignment = Alignment.evaluate(framingCues, match, input.poseEnabled)
+        val alignment = Alignment.evaluate(framingCues, match, poseEnabled)
         // 인물이 없어도 수평은 미리 맞출 수 있게 함께 낸다
-        val cues = if (framingCues == null) alignment.cues + listOfNotNull(levelCue) else alignment.cues
+        val cues = holdSteady(input.lowLight, input.shaky) +
+            if (framingCues == null) alignment.cues + listOfNotNull(levelCue) else alignment.cues
         val hasConstraint = referenceFrame != null || match != null
         val decision = GuidancePrioritizer.decide(cues, state.guidance, input.nowMs)
         val aligned = alignment.aligned && hasConstraint
-        val shutter = AutoShutter.step(state.shutter, aligned, input.autoShutter, input.nowMs)
+        val shutter = AutoShutter.step(state.shutter, aligned, input.autoShutter && !input.lowLight, input.nowMs)
 
         val nextState = LiveState(
             previousCues = cues,

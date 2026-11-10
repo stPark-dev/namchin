@@ -6,6 +6,9 @@ enum class Rotation { CLOCKWISE, COUNTERCLOCKWISE }
 
 /** 촬영 중 안내. priority가 낮을수록 먼저 안내한다. */
 sealed class Guidance(val priority: Int) {
+    /** 어두운 곳에서 손이 떨림 — 사진이 흔들리기 쉬우니 가장 먼저 안내. */
+    data object HoldSteady : Guidance(0)
+
     /** 인물(어깨·골반)이 화면에서 인식되지 않음. */
     data object NoPerson : Guidance(0)
     data class Level(val rotation: Rotation) : Guidance(1)

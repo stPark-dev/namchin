@@ -219,4 +219,43 @@ class LiveGuidanceTest {
 
         assertTrue(again.fire)
     }
+
+    @Test
+    fun `in low light pose and auto shutter are off`() {
+        // 레퍼런스와 다른 포즈여도 야간엔 포즈 안내·자동 셔터가 없다
+        val night = { s: LiveState, now: Long ->
+            LiveGuidance.step(s, LiveInput(reference, pose(STANDING), 0f, poseEnabled = true, nowMs = now, autoShutter = true, lowLight = true))
+        }
+
+        val (s1, first) = night(LiveState(), 0)
+        val (_, held) = night(s1, AutoShutter.HOLD_MS)
+
+        assertNull(first.match)
+        assertFalse(held.fire)
+        assertFalse(first.cues.any { it is Guidance.Pose })
+    }
+
+    @Test
+    fun `shaking in low light asks to hold steady first`() {
+        val (_, out) = LiveGuidance.step(
+            LiveState(),
+            LiveInput(reference, pose(rightArmRaised), 6f, poseEnabled = true, nowMs = 0, lowLight = true, shaky = true),
+        )
+
+        assertEquals(Guidance.HoldSteady, out.display)
+    }
+
+    @Test
+    fun `basic mode also warns about shaking in low light`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), 0f, 0, lowLight = true, shaky = true)
+
+        assertEquals(Guidance.HoldSteady, out.display)
+    }
+
+    @Test
+    fun `shaking in good light is not nagged about`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), 0f, 0, lowLight = false, shaky = true)
+
+        assertFalse(Guidance.HoldSteady in out.cues)
+    }
 }

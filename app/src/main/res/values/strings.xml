@@ -115,4 +115,7 @@
     <string name="tags_confirmed">확정됨</string>
     <string name="tags_confirm">이대로 확정</string>
     <string name="deck_filter_all">전체</string>
+
+    <string name="guide_hold_steady">어두워서 흔들리기 쉬워요. 폰을 두 손으로 단단히 잡으세요</string>
+    <string name="camera_night">야간 · 포즈 비교 꺼짐</string>
 </resources>

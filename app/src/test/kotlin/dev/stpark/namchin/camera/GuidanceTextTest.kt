@@ -10,6 +10,7 @@ class GuidanceTextTest {
 
     private val allCues: List<Guidance> = listOf(
         Guidance.NoPerson,
+        Guidance.HoldSteady,
         Guidance.Level(Rotation.CLOCKWISE),
         Guidance.Level(Rotation.COUNTERCLOCKWISE),
         Guidance.MoveCloser,

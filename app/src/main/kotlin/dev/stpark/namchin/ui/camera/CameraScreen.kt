@@ -70,6 +70,8 @@ import androidx.camera.core.Camera
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import dev.stpark.namchin.camera.tiltDegrees
+import dev.stpark.namchin.camera.angularSpeed
+import kotlinx.coroutines.launch
 import dev.stpark.namchin.core.framing.FramingAnalyzer
 import dev.stpark.namchin.core.guidance.Guidance
 import android.util.Rational
@@ -168,7 +170,10 @@ private fun CameraContent(
     }
     // 화면이 보일 때만 센서 사용
     LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { tiltDegrees(context).collect(vm::onTilt) }
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            launch { angularSpeed(context).collect(vm::onGyro) }
+            tiltDegrees(context).collect(vm::onTilt)
+        }
     }
     val reference = state.reference
     LaunchedEffect(all) { vm.updateReferences(all) }
@@ -259,6 +264,7 @@ private fun CameraContent(
             ) {
                 if (reference != null) AppliedReferenceChip(reference, onClear = { onSelectReference(null) })
                 Spacer(Modifier.weight(1f))
+                if (state.lowLight) NightBadge(Modifier.padding(end = 8.dp))
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Rounded.Settings, stringResource(R.string.cd_settings), tint = Color.White)
                 }
