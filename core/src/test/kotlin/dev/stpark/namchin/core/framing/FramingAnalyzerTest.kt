@@ -8,9 +8,10 @@ import org.junit.jupiter.api.Test
 
 class FramingAnalyzerTest {
 
-    private val reference = PersonFrame(anchorX = 0.5f, anchorY = 0.3f, torso = 0.25f)
+    private val reference = PersonFrame(anchorX = 0.5f, anchorY = 0.3f, torso = 0.25f, neck = 0.1f)
 
-    private fun frame(x: Float = 0.5f, y: Float = 0.3f, torso: Float = 0.25f) = PersonFrame(x, y, torso)
+    private fun frame(x: Float = 0.5f, y: Float = 0.3f, torso: Float? = 0.25f, neck: Float? = 0.1f) =
+        PersonFrame(x, y, torso, neck)
 
     private fun analyze(current: PersonFrame, roll: Float = 0f, previous: List<Guidance> = emptyList()) =
         FramingAnalyzer.analyze(reference, current, rollDegrees = roll, previous = previous)
@@ -77,5 +78,24 @@ class FramingAnalyzerTest {
     @Test
     fun `hysteresis only applies to the same direction`() {
         assertTrue(analyze(frame(x = 0.46f), previous = listOf(Guidance.PanRight)).isEmpty())
+    }
+
+    @Test
+    fun `falls back to neck length when either side has no torso`() {
+        val closeUpRef = PersonFrame(0.5f, 0.3f, torso = null, neck = 0.2f)
+
+        val tooFar = FramingAnalyzer.analyze(closeUpRef, frame(torso = 0.25f, neck = 0.1f), 0f)
+        val matching = FramingAnalyzer.analyze(closeUpRef, frame(torso = null, neck = 0.2f), 0f)
+
+        assertEquals(listOf(Guidance.MoveCloser), tooFar)
+        assertTrue(matching.isEmpty())
+    }
+
+    @Test
+    fun `no shared length means no distance cue`() {
+        val torsoOnly = frame(torso = 0.1f, neck = null)
+        val neckOnly = PersonFrame(0.5f, 0.3f, torso = null, neck = 0.1f)
+
+        assertTrue(FramingAnalyzer.analyze(neckOnly, torsoOnly, 0f).isEmpty())
     }
 }

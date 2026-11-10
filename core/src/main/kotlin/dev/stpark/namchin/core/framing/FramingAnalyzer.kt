@@ -33,11 +33,18 @@ object FramingAnalyzer {
                 rollDegrees, LEVEL_TOLERANCE_DEG,
                 Guidance.Level(Rotation.COUNTERCLOCKWISE), Guidance.Level(Rotation.CLOCKWISE),
             ),
-            pick(current.torso / reference.torso - 1, SIZE_TOLERANCE, Guidance.MoveBack, Guidance.MoveCloser),
+            sizeRatio(reference, current)?.let { pick(it - 1, SIZE_TOLERANCE, Guidance.MoveBack, Guidance.MoveCloser) },
             // 인물이 화면 위쪽(음수)에 있으면 폰을 위로 기울여야 인물이 내려온다.
             pick(current.anchorY - reference.anchorY, POSITION_TOLERANCE, Guidance.TiltDown, Guidance.TiltUp),
             // 인물이 화면 왼쪽(음수)에 있으면 폰을 왼쪽으로 돌려야 인물이 오른쪽으로 온다.
             pick(current.anchorX - reference.anchorX, POSITION_TOLERANCE, Guidance.PanRight, Guidance.PanLeft),
         )
+    }
+
+    /** 몸통 길이가 양쪽에 다 있으면 몸통, 아니면 목 길이로 비교. 공통 기준이 없으면 null. */
+    private fun sizeRatio(reference: PersonFrame, current: PersonFrame): Float? = when {
+        reference.torso != null && current.torso != null -> current.torso / reference.torso
+        reference.neck != null && current.neck != null -> current.neck / reference.neck
+        else -> null
     }
 }
