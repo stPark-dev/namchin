@@ -1,6 +1,14 @@
 package dev.stpark.namchin.ui.camera
 
+import android.annotation.SuppressLint
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.util.Size
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -41,13 +49,18 @@ private val ANALYSIS_SIZE = Size(1280, 960)
  * 같은 4:3 박스 안의 정규화 좌표가 분석 좌표와 그대로 겹친다.
  */
 @Composable
-fun CameraPreview(onFrame: (PoseFrame) -> Unit, modifier: Modifier = Modifier) {
+fun CameraPreview(
+    onFrame: (PoseFrame) -> Unit,
+    onCameraReady: (Camera) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember {
         PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
     }
     val currentOnFrame by rememberUpdatedState(onFrame)
+    val currentOnCameraReady by rememberUpdatedState(onCameraReady)
     var failed by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
@@ -63,7 +76,9 @@ fun CameraPreview(onFrame: (PoseFrame) -> Unit, modifier: Modifier = Modifier) {
                 val p = future.get().also { provider = it }
                 val ratio = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
-                val preview = Preview.Builder().setResolutionSelector(ratio.build()).build()
+                val preview = Preview.Builder().setResolutionSelector(ratio.build())
+                    .also(::logActiveLens)
+                    .build()
                     .also { it.surfaceProvider = previewView.surfaceProvider }
                 val analysis = ImageAnalysis.Builder()
                     .setResolutionSelector(
@@ -76,7 +91,11 @@ fun CameraPreview(onFrame: (PoseFrame) -> Unit, modifier: Modifier = Modifier) {
                     .also { it.setAnalyzer(executor, analyzer) }
                 analysisUseCase = analysis
                 p.unbindAll()
-                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                val camera = p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                camera.cameraInfo.zoomState.value?.let {
+                    Log.i(TAG, "zoom range=${it.minZoomRatio}..${it.maxZoomRatio}")
+                }
+                currentOnCameraReady(camera)
                 // 오버레이는 프리뷰와 분석이 같은 4:3 화각이라고 가정한다
                 Log.i(TAG, "preview=${preview.resolutionInfo?.resolution} analysis=${analysis.resolutionInfo?.resolution}")
             } catch (e: Exception) {
@@ -102,3 +121,25 @@ fun CameraPreview(onFrame: (PoseFrame) -> Unit, modifier: Modifier = Modifier) {
 }
 
 private const val TAG = "CameraPreview"
+
+/** 줌에 따라 실제로 어느 물리 렌즈(초광각/기본/망원)가 쓰이는지 로그로 남긴다. */
+@SuppressLint("UnsafeOptInUsageError")
+@androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
+private fun logActiveLens(builder: Preview.Builder) {
+    var lastLens: String? = null
+    Camera2Interop.Extender(builder).setSessionCaptureCallback(
+        object : CameraCaptureSession.CaptureCallback() {
+            override fun onCaptureCompleted(
+                session: CameraCaptureSession,
+                request: CaptureRequest,
+                result: TotalCaptureResult,
+            ) {
+                val lens = result.get(CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID)
+                if (lens != lastLens) {
+                    lastLens = lens
+                    Log.i(TAG, "active lens=$lens zoom=${result.get(CaptureResult.CONTROL_ZOOM_RATIO)}")
+                }
+            }
+        },
+    )
+}

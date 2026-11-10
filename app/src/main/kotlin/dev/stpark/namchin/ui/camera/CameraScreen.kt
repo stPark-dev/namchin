@@ -41,6 +41,11 @@ import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraUiState
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.GuidanceText
+import dev.stpark.namchin.camera.ZoomLogic
+import androidx.camera.core.Camera
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.input.pointer.pointerInput
 import dev.stpark.namchin.camera.tiltDegrees
 import dev.stpark.namchin.core.framing.FramingAnalyzer
 import dev.stpark.namchin.core.guidance.Guidance
@@ -85,6 +90,14 @@ private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
     val vm: CameraViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     var ghostAlpha by rememberSaveable { mutableFloatStateOf(0.35f) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var zoomRatio by rememberSaveable { mutableFloatStateOf(1f) }
+    val zoomRange = camera?.cameraInfo?.zoomState?.value?.let { it.minZoomRatio..it.maxZoomRatio }
+    fun setZoom(ratio: Float) {
+        val range = zoomRange ?: return
+        zoomRatio = ratio.coerceIn(range.start, range.endInclusive)
+        camera?.cameraControl?.setZoomRatio(zoomRatio)
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(referenceId) { vm.start(referenceId) }
     // 화면이 보일 때만 센서 사용
@@ -97,8 +110,25 @@ private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
             TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
             GuidanceBanner(state, Modifier.weight(1f))
         }
-        Box(Modifier.fillMaxWidth().aspectRatio(ANALYSIS_ASPECT)) {
-            CameraPreview(vm::onFrame, Modifier.fillMaxSize())
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(ANALYSIS_ASPECT)
+                .pointerInput(zoomRange) {
+                    val range = zoomRange ?: return@pointerInput
+                    detectTransformGestures { _, _, scale, _ ->
+                        setZoom(ZoomLogic.pinch(zoomRatio, scale, range.start, range.endInclusive))
+                    }
+                },
+        ) {
+            CameraPreview(
+                onFrame = vm::onFrame,
+                onCameraReady = {
+                    camera = it
+                    it.cameraControl.setZoomRatio(zoomRatio)
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
             val reference = state.reference
             val region = state.region
             if (reference != null && region != null) {
@@ -109,6 +139,14 @@ private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
             val level = state.output?.let { out -> out.cues.none { it is Guidance.Level } }
                 ?: (roll == null || abs(roll) <= FramingAnalyzer.LEVEL_TOLERANCE_DEG)
             LevelIndicator(roll, level, Modifier.fillMaxSize())
+        }
+        zoomRange?.let { range ->
+            ZoomButtons(
+                presets = ZoomLogic.presets(range.start, range.endInclusive),
+                current = zoomRatio,
+                onSelect = ::setZoom,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
         }
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.camera_ghost), color = Color.White)
@@ -123,6 +161,29 @@ private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
                 color = Color.Gray,
                 fontSize = 12.sp,
             )
+        }
+    }
+}
+
+@Composable
+private fun ZoomButtons(presets: List<Float>, current: Float, onSelect: (Float) -> Unit, modifier: Modifier = Modifier) {
+    val selected = ZoomLogic.selected(current, presets)
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+        presets.forEach { preset ->
+            val isSelected = preset == selected
+            TextButton(
+                onClick = { onSelect(preset) },
+                modifier = Modifier.background(
+                    if (isSelected) Color.White.copy(alpha = 0.25f) else Color.Transparent,
+                    CircleShape,
+                ),
+            ) {
+                Text(
+                    if (isSelected) ZoomLogic.label(current) else ZoomLogic.label(preset),
+                    color = if (isSelected) Color(0xFFFFD600) else Color.White,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                )
+            }
         }
     }
 }
