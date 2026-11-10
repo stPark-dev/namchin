@@ -2,6 +2,7 @@ package dev.stpark.namchin.capture
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.media.MediaActionSound
 import android.provider.MediaStore
@@ -29,7 +30,9 @@ object PhotoSaver {
     ) = Burst.run(count, isActive, { done -> take(context, capture) { uri -> done(uri != null) } }, onDone)
 
     fun take(context: Context, capture: ImageCapture, onResult: (Uri?) -> Unit) {
-        sound.play(MediaActionSound.SHUTTER_CLICK)
+        // 개발(디버그) 빌드에서는 셔터음을 끈다. 릴리스 빌드에서는 항상 울린다
+        val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!debuggable) sound.play(MediaActionSound.SHUTTER_CLICK)
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, CaptureNaming.displayName(System.currentTimeMillis()))
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
