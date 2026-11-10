@@ -2,6 +2,11 @@ package dev.stpark.namchin.data
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import dev.stpark.namchin.core.tagging.Embedding
+import dev.stpark.namchin.core.tagging.EmbeddingCodec
+import dev.stpark.namchin.core.tagging.Tag
+import dev.stpark.namchin.core.tagging.TagCodec
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.model.PoseCodec
 import dev.stpark.namchin.core.reference.ReferenceProfile
@@ -21,6 +26,9 @@ data class Reference(
     val width: Int,
     val height: Int,
     val pose: PersonPose?,
+    val embedding: Embedding? = null,
+    val tags: Set<Tag> = emptySet(),
+    val tagsConfirmed: Boolean = false,
 ) {
     val aspectRatio: Float get() = width.toFloat() / height
     val profile: ReferenceProfile by lazy { ReferenceProfile.of(pose) }
@@ -35,7 +43,8 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
      * 크롭된 이미지를 앱 저장소에 JPEG로 쓰고 DB에 등록한다.
      * 호출한 화면이 사라져도 파일·DB가 어긋나지 않게 취소 불가로 끝까지 수행한다.
      */
-    suspend fun save(bitmap: Bitmap, pose: PersonPose?): Long = withContext(Dispatchers.IO + NonCancellable) {
+    suspend fun save(bitmap: Bitmap, pose: PersonPose?, embedding: Embedding?): Long =
+        withContext(Dispatchers.IO + NonCancellable) {
         imageDir.mkdirs()
         val file = File(imageDir, "${UUID.randomUUID()}.jpg")
         try {
@@ -48,6 +57,7 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
                     height = bitmap.height,
                     pose = pose?.let(PoseCodec::encode),
                     createdAt = System.currentTimeMillis(),
+                    embedding = embedding?.let(EmbeddingCodec::encode),
                 ),
             )
         } catch (e: Exception) {
@@ -63,8 +73,28 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
         File(entity.imagePath).delete()
     }
 
-    private fun ReferenceEntity.toDomain() =
-        Reference(id, imagePath, width, height, pose?.let(PoseCodec::decode))
+    /** 임베딩이 없는 레퍼런스(이전 버전에서 저장한 것)를 채운다. 채운 개수를 돌려준다. */
+    suspend fun backfillEmbeddings(embed: (Bitmap) -> Embedding?): Int = withContext(Dispatchers.IO) {
+        dao.withoutEmbedding().count { entity ->
+            val bitmap = BitmapFactory.decodeFile(entity.imagePath, BitmapFactory.Options().apply { inSampleSize = 4 })
+                ?: return@count false
+            val embedding = embed(bitmap) ?: return@count false
+            dao.updateEmbedding(entity.id, EmbeddingCodec.encode(embedding))
+            true
+        }
+    }
+
+    suspend fun updateTags(id: Long, tags: Set<Tag>, confirmed: Boolean) = withContext(Dispatchers.IO) {
+        dao.updateTags(id, TagCodec.encode(tags), confirmed)
+    }
+
+    private fun ReferenceEntity.toDomain() = Reference(
+        id, imagePath, width, height,
+        pose = pose?.let(PoseCodec::decode),
+        embedding = embedding?.let(EmbeddingCodec::decode),
+        tags = tags?.let(TagCodec::decode).orEmpty(),
+        tagsConfirmed = tagsConfirmed,
+    )
 
     companion object {
         private const val JPEG_QUALITY = 92

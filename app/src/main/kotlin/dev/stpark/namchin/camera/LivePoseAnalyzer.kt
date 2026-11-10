@@ -1,5 +1,7 @@
 package dev.stpark.namchin.camera
 
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
@@ -30,7 +32,10 @@ class PoseFrame(
 class LivePoseAnalyzer(
     private val analysisExecutor: Executor,
     private val onFrame: (PoseFrame) -> Unit,
+    /** SCENE_INTERVAL_MS마다 세로로 돌린 작은 프레임 (분석 스레드에서 호출) */
+    private val onScene: (Bitmap) -> Unit = {},
 ) : ImageAnalysis.Analyzer, AutoCloseable {
+    private var lastSceneAt = 0L
     private val closeExecutor = FallbackExecutor(analysisExecutor)
     private val detector = PoseDetection.getClient(
         AccuratePoseDetectorOptions.Builder()
@@ -46,6 +51,10 @@ class LivePoseAnalyzer(
         val width = if (upright) proxy.height else proxy.width
         val height = if (upright) proxy.width else proxy.height
         val start = SystemClock.elapsedRealtime()
+        if (start - lastSceneAt >= SCENE_INTERVAL_MS) {
+            lastSceneAt = start
+            runCatching { onScene(sceneBitmap(proxy, rotation)) }.onFailure { Log.w(TAG, "장면 프레임 실패", it) }
+        }
         val task = try {
             detector.process(InputImage.fromMediaImage(media, rotation))
         } catch (e: Exception) {
@@ -64,7 +73,20 @@ class LivePoseAnalyzer(
 
     override fun close() = detector.close()
 
+    /** 프레임을 세로로 돌리고 긴 변 SCENE_SIZE로 줄인다. */
+    private fun sceneBitmap(proxy: ImageProxy, rotation: Int): Bitmap {
+        val full = proxy.toBitmap()
+        val scale = SCENE_SIZE.toFloat() / maxOf(full.width, full.height)
+        val matrix = Matrix().apply {
+            postScale(scale, scale)
+            postRotate(rotation.toFloat())
+        }
+        return Bitmap.createBitmap(full, 0, 0, full.width, full.height, matrix, true).also { full.recycle() }
+    }
+
     private companion object {
         const val TAG = "LivePoseAnalyzer"
+        const val SCENE_INTERVAL_MS = 2_000L
+        const val SCENE_SIZE = 256
     }
 }

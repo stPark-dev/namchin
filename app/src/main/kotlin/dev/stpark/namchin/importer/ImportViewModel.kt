@@ -12,6 +12,7 @@ import dev.stpark.namchin.core.crop.ScreenshotCropDetector
 import dev.stpark.namchin.data.ReferenceRepository
 import dev.stpark.namchin.image.BitmapLoader
 import dev.stpark.namchin.ml.ReferencePoseAnalyzer
+import dev.stpark.namchin.ml.SceneEmbedder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -77,7 +78,13 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 analyzerCreated = true
                 val pose = analyzer.analyze(cropped)
-                ImportUiState.Saved(repository.save(cropped, pose))
+                // 임베딩 실패는 저장을 막지 않는다 (앱 시작 시 다시 채움)
+                val embedding = withContext(Dispatchers.Default) {
+                    runCatching { SceneEmbedder.get(getApplication()).embed(cropped) }
+                        .onFailure { Log.w(TAG, "임베딩 실패", it) }
+                        .getOrNull()
+                }
+                ImportUiState.Saved(repository.save(cropped, pose, embedding))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

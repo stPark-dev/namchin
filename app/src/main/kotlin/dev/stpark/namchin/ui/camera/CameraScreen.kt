@@ -165,6 +165,12 @@ private fun CameraContent(
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { tiltDegrees(context).collect(vm::onTilt) }
     }
     val reference = state.reference
+    LaunchedEffect(all) { vm.updateReferences(all) }
+    val orderedCards = remember(all, state.cardOrder) {
+        val order = state.cardOrder ?: return@remember all
+        val byId = all.associateBy { it.id }
+        order.mapNotNull { byId[it] } + all.filter { it.id !in order }
+    }
     LaunchedEffect(flash) { if (flash) { delay(FLASH_MS); flash = false } }
     LaunchedEffect(message) { if (message != null) { delay(MESSAGE_MS); message = null } }
     BackHandler(enabled = deckOpen) { deckOpen = false }
@@ -262,6 +268,7 @@ private fun CameraContent(
             ) {
                 CameraPreview(
                     onFrame = vm::onFrame,
+                    onScene = vm::onSceneFrame,
                     onCameraReady = { cam, capture ->
                         camera = cam
                         imageCapture = capture
@@ -335,7 +342,8 @@ private fun CameraContent(
                     )
                 }
                 CardHand(
-                    references = all.filter { it.id != referenceId },
+                    // 지금 장면과 배경이 비슷한 레퍼런스가 앞으로
+                    references = orderedCards.filter { it.id != referenceId },
                     onSelect = { onSelectReference(it.id) },
                     onExpand = { deckOpen = true },
                     modifier = Modifier.align(Alignment.BottomEnd).width(150.dp).fillMaxHeight(),

@@ -12,6 +12,9 @@ import dev.stpark.namchin.core.live.Region
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.data.Reference
 import dev.stpark.namchin.ml.MlKitPoseMapper
+import android.graphics.Bitmap
+import dev.stpark.namchin.core.tagging.SceneRanking
+import dev.stpark.namchin.ml.SceneEmbedder
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -33,6 +36,8 @@ data class CameraUiState(
     val analysisMs: Long = 0,
     val fps: Float = 0f,
     val settings: FeedbackSettings = FeedbackSettings(),
+    /** 지금 장면과 비슷한 순서의 레퍼런스 id. null이면 원래 순서 */
+    val cardOrder: List<Long>? = null,
 )
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
@@ -59,6 +64,21 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(settings: FeedbackSettings) = _state.update { it.copy(settings = settings) }
+
+    @Volatile private var references: List<Reference> = emptyList()
+    private var previousTop: Long? = null
+
+    fun updateReferences(list: List<Reference>) {
+        references = list
+    }
+
+    /** 분석 스레드에서 2초마다 호출: 장면 임베딩 → 비슷한 순서로 카드 정렬. */
+    fun onSceneFrame(bitmap: Bitmap) {
+        val query = SceneEmbedder.get(getApplication()).embed(bitmap) ?: return
+        val order = SceneRanking.rank(query, references.map { it.id to it.embedding }, previousTop)
+        previousTop = order.firstOrNull()
+        _state.update { it.copy(cardOrder = order) }
+    }
 
     /** 카드 목록이 열려 있는 동안 등 자동 셔터를 잠시 멈춘다. */
     private var autoShutterPaused = false

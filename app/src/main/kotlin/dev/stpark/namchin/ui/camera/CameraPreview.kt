@@ -7,6 +7,7 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
+import android.graphics.Bitmap
 import android.util.Size
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -52,6 +53,7 @@ private val ANALYSIS_SIZE = Size(1280, 960)
 @Composable
 fun CameraPreview(
     onFrame: (PoseFrame) -> Unit,
+    onScene: (Bitmap) -> Unit,
     onCameraReady: (Camera, ImageCapture) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -61,12 +63,13 @@ fun CameraPreview(
         PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
     }
     val currentOnFrame by rememberUpdatedState(onFrame)
+    val currentOnScene by rememberUpdatedState(onScene)
     val currentOnCameraReady by rememberUpdatedState(onCameraReady)
     var failed by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val executor = Executors.newSingleThreadExecutor()
-        val analyzer = LivePoseAnalyzer(executor) { currentOnFrame(it) }
+        val analyzer = LivePoseAnalyzer(executor, onFrame = { currentOnFrame(it) }, onScene = { currentOnScene(it) })
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
         var analysisUseCase: ImageAnalysis? = null

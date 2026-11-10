@@ -31,6 +31,11 @@ android {
     buildFeatures {
         compose = true
     }
+
+    androidResources {
+        // 모델 파일은 압축하지 않아야 MediaPipe가 바로 읽는다
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -49,6 +54,7 @@ dependencies {
     ksp(libs.room.compiler)
     implementation(libs.mlkit.pose.accurate)
     implementation(libs.mlkit.face)
+    implementation(libs.mediapipe.vision)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
     implementation(libs.camerax.core)
