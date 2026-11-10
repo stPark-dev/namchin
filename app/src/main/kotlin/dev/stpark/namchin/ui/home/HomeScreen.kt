@@ -15,6 +15,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,11 +31,17 @@ import dev.stpark.namchin.ui.common.ReferenceImage
 @Composable
 fun HomeScreen(
     references: List<Reference>?,
+    onBack: () -> Unit,
     onAddClick: () -> Unit,
     onReferenceClick: (Long) -> Unit,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.library_title)) },
+                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.library_to_camera)) } },
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(onClick = onAddClick) { Text(stringResource(R.string.home_add_reference)) }
         },

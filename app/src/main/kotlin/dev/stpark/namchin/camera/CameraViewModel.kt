@@ -41,13 +41,16 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     private var live = LiveState()
     private var lastFrameAt = 0L
 
-    /** 촬영 화면에 들어올 때마다 새로 시작한다 (같은 레퍼런스면 다시 불러오지 않음). */
-    fun start(referenceId: Long) {
+    /**
+     * 레퍼런스를 바꿀 때마다 새로 시작한다 (같은 레퍼런스면 다시 불러오지 않음).
+     * @param referenceId null이면 기본 모드
+     */
+    fun start(referenceId: Long?) {
         val cached = _state.value.reference?.takeIf { it.id == referenceId }
         live = LiveState()
         lastFrameAt = 0L
         _state.value = CameraUiState(reference = cached)
-        if (cached == null) {
+        if (referenceId != null && cached == null) {
             viewModelScope.launch {
                 val reference = repository.get(referenceId)
                 _state.update { it.copy(reference = reference) }
@@ -59,21 +62,24 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onFrame(frame: PoseFrame) {
         val snapshot = _state.value
-        val reference = snapshot.reference ?: return
+        val reference = snapshot.reference
         val now = SystemClock.elapsedRealtime()
+        val frameAspect = frame.width.toFloat() / frame.height
         // 같은 값이면 같은 인스턴스를 유지해 오버레이 정적 부분의 재구성을 건너뛰게 한다
-        val region = CropRegion.centerCrop(frame.width.toFloat() / frame.height, reference.aspectRatio)
+        val region = CropRegion.centerCrop(frameAspect, reference?.aspectRatio ?: frameAspect)
             .let { if (it == snapshot.region) snapshot.region else it }
         val current = MlKitPoseMapper.toPersonPose(frame.landmarks, frame.width, frame.height)
             ?.let { CropRegion.remap(it, region) }
-        val output = reference.pose?.let { refPose ->
-            val (next, out) = LiveGuidance.step(
+        val refPose = reference?.pose
+        val (next, output) = when {
+            reference == null -> LiveGuidance.stepBasic(live, current, snapshot.rollDegrees, now)
+            refPose != null -> LiveGuidance.step(
                 live,
                 LiveInput(refPose, current, snapshot.rollDegrees, poseEnabled = true, nowMs = now),
             )
-            live = next
-            out
+            else -> live to null
         }
+        live = next
         val instantFps = if (lastFrameAt > 0) 1000f / (now - lastFrameAt).coerceAtLeast(1) else 0f
         lastFrameAt = now
         _state.update {

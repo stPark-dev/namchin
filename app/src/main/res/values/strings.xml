@@ -52,4 +52,16 @@
     <string name="guide_pose_left_shin">여자친구 왼쪽 종아리를 레퍼런스처럼</string>
     <string name="guide_pose_right_thigh">여자친구 오른쪽 허벅지를 레퍼런스처럼</string>
     <string name="guide_pose_right_shin">여자친구 오른쪽 종아리를 레퍼런스처럼</string>
+
+    <string name="library_title">레퍼런스</string>
+    <string name="library_to_camera">카메라</string>
+    <string name="camera_gallery">레퍼런스</string>
+    <string name="camera_shutter">촬영</string>
+    <string name="camera_saved">갤러리에 저장했어요</string>
+    <string name="camera_save_failed">저장하지 못했어요</string>
+    <string name="camera_clear_reference">레퍼런스 해제</string>
+    <string name="deck_title">레퍼런스 고르기</string>
+    <string name="deck_close">닫기</string>
+    <string name="deck_empty">아직 레퍼런스가 없어요.</string>
+    <string name="deck_add">레퍼런스 추가하러 가기</string>
 </resources>

@@ -9,7 +9,8 @@ class ScreenTest {
     @Test
     fun `every screen survives a save and restore`() {
         listOf(
-            Screen.Home,
+            Screen.Camera(referenceId = null),
+            Screen.Library,
             Screen.Import(uri = "content://media/picker/0/x/1", token = "abc"),
             Screen.Detail(id = 42),
             Screen.Camera(referenceId = 7),
@@ -22,6 +23,7 @@ class ScreenTest {
         assertNull(Screen.restore(listOf("Detail", "not-a-number")))
         assertNull(Screen.restore(emptyList()))
         assertNull(Screen.restore(listOf("Camera")))
+        assertNull(Screen.restore(listOf("Camera", "x")))
     }
 
     @Test

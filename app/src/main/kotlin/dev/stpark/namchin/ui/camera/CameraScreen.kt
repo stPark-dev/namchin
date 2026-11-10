@@ -45,10 +45,20 @@ import dev.stpark.namchin.camera.ZoomLogic
 import androidx.camera.core.Camera
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.pointer.pointerInput
 import dev.stpark.namchin.camera.tiltDegrees
 import dev.stpark.namchin.core.framing.FramingAnalyzer
 import dev.stpark.namchin.core.guidance.Guidance
+import android.util.Rational
+import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
+import androidx.camera.core.ImageCapture
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.platform.LocalView
+import dev.stpark.namchin.capture.PhotoSaver
+import dev.stpark.namchin.data.Reference
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -56,8 +66,17 @@ import kotlin.math.abs
 
 private const val ANALYSIS_ASPECT = 3f / 4f
 
+/**
+ * 시작 화면. referenceId가 null이면 기본 모드, 있으면 레퍼런스 모드.
+ * @param references 레퍼런스 목록 (null = 로딩 중)
+ */
 @Composable
-fun CameraScreen(referenceId: Long, onBack: () -> Unit) {
+fun CameraScreen(
+    referenceId: Long?,
+    references: List<Reference>?,
+    onSelectReference: (Long?) -> Unit,
+    onOpenLibrary: () -> Unit,
+) {
     val context = LocalContext.current
     var granted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
@@ -67,7 +86,7 @@ fun CameraScreen(referenceId: Long, onBack: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
         if (granted) {
-            CameraContent(referenceId, onBack)
+            CameraContent(referenceId, references.orEmpty(), onSelectReference, onOpenLibrary)
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -78,79 +97,134 @@ fun CameraScreen(referenceId: Long, onBack: () -> Unit) {
                 Button(onClick = { request.launch(Manifest.permission.CAMERA) }) {
                     Text(stringResource(R.string.camera_permission_grant))
                 }
-                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
             }
         }
     }
 }
 
 @Composable
-private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
+private fun CameraContent(
+    referenceId: Long?,
+    references: List<Reference>,
+    onSelectReference: (Long?) -> Unit,
+    onOpenLibrary: () -> Unit,
+) {
     val context = LocalContext.current
+    val view = LocalView.current
     val vm: CameraViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     var ghostAlpha by rememberSaveable { mutableFloatStateOf(0.35f) }
     var camera by remember { mutableStateOf<Camera?>(null) }
+    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var zoomRatio by rememberSaveable { mutableFloatStateOf(1f) }
+    var deckOpen by rememberSaveable { mutableStateOf(false) }
+    var capturing by remember { mutableStateOf(false) }
+    var flash by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<Int?>(null) }
     val zoomRange = camera?.cameraInfo?.zoomState?.value?.let { it.minZoomRatio..it.maxZoomRatio }
     fun setZoom(ratio: Float) {
         val range = zoomRange ?: return
         zoomRatio = ratio.coerceIn(range.start, range.endInclusive)
         camera?.cameraControl?.setZoomRatio(zoomRatio)
     }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(referenceId) { vm.start(referenceId) }
     // 화면이 보일 때만 센서 사용
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { tiltDegrees(context).collect(vm::onTilt) }
     }
+    val reference = state.reference
+    // 저장되는 사진도 화면의 밝은 영역(레퍼런스 비율)과 같게 자른다
+    LaunchedEffect(imageCapture, reference) {
+        imageCapture?.setCropAspectRatio(reference?.let { Rational(it.width, it.height) } ?: Rational(3, 4))
+    }
+    LaunchedEffect(flash) { if (flash) { delay(FLASH_MS); flash = false } }
+    LaunchedEffect(message) { if (message != null) { delay(MESSAGE_MS); message = null } }
+    BackHandler(enabled = deckOpen) { deckOpen = false }
 
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-            GuidanceBanner(state, Modifier.weight(1f))
+    val shoot = shoot@{
+        val capture = imageCapture ?: return@shoot
+        capturing = true
+        flash = true
+        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        PhotoSaver.take(context, capture) { uri ->
+            capturing = false
+            message = if (uri != null) R.string.camera_saved else R.string.camera_save_failed
         }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(ANALYSIS_ASPECT)
-                .pointerInput(zoomRange) {
-                    val range = zoomRange ?: return@pointerInput
-                    detectTransformGestures { _, _, scale, _ ->
-                        setZoom(ZoomLogic.pinch(zoomRatio, scale, range.start, range.endInclusive))
-                    }
-                },
-        ) {
-            CameraPreview(
-                onFrame = vm::onFrame,
-                onCameraReady = {
-                    camera = it
-                    it.cameraControl.setZoomRatio(zoomRatio)
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-            val reference = state.reference
-            val region = state.region
-            if (reference != null && region != null) {
-                StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
-                LiveSkeleton(state.current, region, state.output?.aligned == true, Modifier.fillMaxSize())
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.fillMaxWidth().padding(8.dp).heightIn(min = 72.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (reference != null) AppliedReferenceChip(reference, onClear = { onSelectReference(null) })
+                GuidanceBanner(state, Modifier.weight(1f))
             }
-            val roll = state.rollDegrees
-            val level = state.output?.let { out -> out.cues.none { it is Guidance.Level } }
-                ?: (roll == null || abs(roll) <= FramingAnalyzer.LEVEL_TOLERANCE_DEG)
-            LevelIndicator(roll, level, Modifier.fillMaxSize())
-        }
-        zoomRange?.let { range ->
-            ZoomButtons(
-                presets = ZoomLogic.presets(range.start, range.endInclusive),
-                current = zoomRatio,
-                onSelect = ::setZoom,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ANALYSIS_ASPECT)
+                    .pointerInput(zoomRange) {
+                        val range = zoomRange ?: return@pointerInput
+                        detectTransformGestures { _, _, scale, _ ->
+                            setZoom(ZoomLogic.pinch(zoomRatio, scale, range.start, range.endInclusive))
+                        }
+                    },
+            ) {
+                CameraPreview(
+                    onFrame = vm::onFrame,
+                    onCameraReady = { cam, capture ->
+                        camera = cam
+                        imageCapture = capture
+                        cam.cameraControl.setZoomRatio(zoomRatio)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                val region = state.region
+                if (region != null) {
+                    if (reference != null) StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
+                    LiveSkeleton(state.current, region, state.output?.aligned == true, Modifier.fillMaxSize())
+                }
+                val roll = state.rollDegrees
+                val level = state.output?.let { out -> out.cues.none { it is Guidance.Level } }
+                    ?: (roll == null || abs(roll) <= FramingAnalyzer.LEVEL_TOLERANCE_DEG)
+                LevelIndicator(roll, level, Modifier.fillMaxSize())
+                zoomRange?.let { range ->
+                    ZoomButtons(
+                        presets = ZoomLogic.presets(range.start, range.endInclusive),
+                        current = zoomRatio,
+                        onSelect = ::setZoom,
+                        modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                    )
+                }
+                if (flash) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.7f)))
+                message?.let {
+                    Text(
+                        stringResource(it),
+                        color = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .background(Color(0xAA000000), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
+            if (reference != null) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.camera_ghost), color = Color.White, fontSize = 12.sp)
+                    Slider(value = ghostAlpha, onValueChange = { ghostAlpha = it }, modifier = Modifier.padding(start = 12.dp).weight(1f))
+                }
+            }
+            ShutterBar(
+                latestReference = references.firstOrNull(),
+                capturing = capturing,
+                onShutter = shoot,
+                onOpenLibrary = onOpenLibrary,
+                modifier = Modifier.fillMaxWidth().weight(1f),
             )
-        }
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.camera_ghost), color = Color.White)
-            Slider(value = ghostAlpha, onValueChange = { ghostAlpha = it })
             Text(
                 stringResource(
                     R.string.camera_stats,
@@ -159,11 +233,35 @@ private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
                     state.output?.match?.let { "%.2f".format(it.score) } ?: "-",
                 ),
                 color = Color.Gray,
-                fontSize = 12.sp,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+            )
+        }
+        CardHand(
+            references = references.filter { it.id != referenceId },
+            onSelect = { onSelectReference(it.id) },
+            onExpand = { deckOpen = true },
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
+        if (deckOpen) {
+            CardDeck(
+                references = references,
+                onSelect = {
+                    deckOpen = false
+                    onSelectReference(it.id)
+                },
+                onClose = { deckOpen = false },
+                onAddReference = {
+                    deckOpen = false
+                    onOpenLibrary()
+                },
             )
         }
     }
 }
+
+private const val FLASH_MS = 80L
+private const val MESSAGE_MS = 1_500L
 
 @Composable
 private fun ZoomButtons(presets: List<Float>, current: Float, onSelect: (Float) -> Unit, modifier: Modifier = Modifier) {

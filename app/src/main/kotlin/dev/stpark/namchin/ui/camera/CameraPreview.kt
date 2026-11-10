@@ -11,6 +11,7 @@ import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -51,7 +52,7 @@ private val ANALYSIS_SIZE = Size(1280, 960)
 @Composable
 fun CameraPreview(
     onFrame: (PoseFrame) -> Unit,
-    onCameraReady: (Camera) -> Unit,
+    onCameraReady: (Camera, ImageCapture) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -90,12 +91,23 @@ fun CameraPreview(
                     .build()
                     .also { it.setAnalyzer(executor, analyzer) }
                 analysisUseCase = analysis
+                val capture = ImageCapture.Builder()
+                    .setResolutionSelector(
+                        ResolutionSelector.Builder()
+                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                            .build(),
+                    )
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .build()
                 p.unbindAll()
-                val camera = p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                val camera = p.bindToLifecycle(
+                    lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis, capture,
+                )
                 camera.cameraInfo.zoomState.value?.let {
                     Log.i(TAG, "zoom range=${it.minZoomRatio}..${it.maxZoomRatio}")
                 }
-                currentOnCameraReady(camera)
+                Log.i(TAG, "capture=${capture.resolutionInfo?.resolution}")
+                currentOnCameraReady(camera, capture)
                 // 오버레이는 프리뷰와 분석이 같은 4:3 화각이라고 가정한다
                 Log.i(TAG, "preview=${preview.resolutionInfo?.resolution} analysis=${analysis.resolutionInfo?.resolution}")
             } catch (e: Exception) {

@@ -129,4 +129,29 @@ class LiveGuidanceTest {
 
         assertFalse(out.aligned)
     }
+
+    @Test
+    fun `basic mode with a level phone has nothing to say`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), rollDegrees = 1f, nowMs = 0)
+
+        assertNull(out.display)
+        assertFalse(out.aligned)
+        assertNull(out.match)
+    }
+
+    @Test
+    fun `basic mode coaches level and announces once stable`() {
+        val (s1, first) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), rollDegrees = 6f, nowMs = 0)
+        val (_, later) = LiveGuidance.stepBasic(s1, pose(STANDING), rollDegrees = 6f, nowMs = STABLE_MS)
+
+        assertEquals(Guidance.Level(Rotation.COUNTERCLOCKWISE), first.display)
+        assertEquals(Guidance.Level(Rotation.COUNTERCLOCKWISE), later.announce)
+    }
+
+    @Test
+    fun `basic mode does not nag when nobody is in frame`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), current = null, rollDegrees = 0f, nowMs = 0)
+
+        assertTrue(out.cues.isEmpty())
+    }
 }

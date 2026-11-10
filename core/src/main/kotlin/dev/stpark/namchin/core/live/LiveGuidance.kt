@@ -46,6 +46,18 @@ data class LiveOutput(
 /** 카메라 한 프레임 → 안내/일치 판정. 순수 함수. */
 object LiveGuidance {
 
+    /**
+     * 기본 모드(레퍼런스 없음). 지금은 수평만 본다 — 구도 규칙은 Phase 5에서 추가.
+     * 풍경만 찍을 수도 있으니 인물이 없어도 재촉하지 않는다. 자동 셔터가 없으므로 aligned는 항상 false.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun stepBasic(state: LiveState, current: PersonPose?, rollDegrees: Float?, nowMs: Long): Pair<LiveState, LiveOutput> {
+        val cues = listOfNotNull(rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) })
+        val decision = GuidancePrioritizer.decide(cues, state.guidance, nowMs)
+        val nextState = state.copy(previousCues = cues, guidance = decision.state)
+        return nextState to LiveOutput(decision.display, cues, decision.announce, aligned = false, match = null)
+    }
+
     fun step(state: LiveState, input: LiveInput): Pair<LiveState, LiveOutput> {
         val referenceFrame = PersonFrame.from(input.reference)
         val currentFrame = input.current?.let(PersonFrame::from)
