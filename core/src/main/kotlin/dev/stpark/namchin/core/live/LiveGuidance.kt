@@ -106,7 +106,9 @@ object LiveGuidance {
             // 포즈 안내에 "어떻게" 고칠지 붙인다
             val current = input.current
             if (current == null || match == null) a else a.copy(cues = a.cues.map { cue ->
-                if (cue is Guidance.Pose) cue.copy(direction = PoseDirection.of(input.reference, current, cue.part, match.mirrored)) else cue
+                if (cue !is Guidance.Pose) return@map cue
+                val previous = state.previousCues.firstNotNullOfOrNull { (it as? Guidance.Pose)?.takeIf { p -> p.part == cue.part }?.direction }
+                cue.copy(direction = PoseDirection.of(input.reference, current, cue.part, match.mirrored, previous))
             })
         }
         // 인물이 없어도 수평은 미리 맞출 수 있게 함께 낸다

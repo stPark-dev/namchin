@@ -268,4 +268,20 @@ class LiveGuidanceTest {
         val cue = out.display as Guidance.Pose
         assertEquals(dev.stpark.namchin.core.pose.PoseDirection.Direction.RAISE, cue.direction)
     }
+
+    @Test
+    fun `pose direction jitter near the diagonal does not block the announcement`() {
+        // 레퍼런스: 오른팔 수평. 팔을 내렸다가(→ 올려) 살짝 몸 쪽으로 흔들려도 같은 안내를 이어 간다
+        val down = pose(STANDING)
+        val slightlyIn = pose(STANDING.with(Joint.RIGHT_ELBOW to Point(0.46f, 0.40f), Joint.RIGHT_WRIST to Point(0.47f, 0.50f)))
+
+        val (s1, o1) = step(down, now = 0)
+        val (s2, o2) = step(slightlyIn, state = s1, now = 200)
+        val (_, o3) = step(slightlyIn, state = s2, now = 450)
+
+        listOf(o1, o2, o3).forEach {
+            assertEquals(dev.stpark.namchin.core.pose.PoseDirection.Direction.RAISE, (it.display as Guidance.Pose).direction)
+        }
+        assertTrue(o3.announce is Guidance.Pose)
+    }
 }

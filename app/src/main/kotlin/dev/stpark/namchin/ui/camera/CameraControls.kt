@@ -76,14 +76,22 @@ fun GuidanceCapsule(state: CameraUiState, modifier: Modifier = Modifier) {
         else -> return
     }
     val cue = display.takeUnless { noPose }
-    var showWhy by remember(cue) { mutableStateOf(false) }
+    // 같은 이유인 동안(예: 포즈 방향만 바뀜)은 펼친 채로 둔다
+    val reason = cue?.let(GuidanceText::reason)
+    var showWhy by remember(reason) { mutableStateOf(false) }
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             Modifier
                 .clip(RoundedCornerShape(50))
                 .background(Glass)
                 .border(1.dp, GlassBorder, RoundedCornerShape(50))
-                .then(if (cue != null) Modifier.clickable { showWhy = !showWhy } else Modifier)
+                .then(
+                    if (reason != null) {
+                        Modifier.clickable(onClickLabel = stringResource(R.string.cd_why), role = Role.Button) { showWhy = !showWhy }
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -96,7 +104,7 @@ fun GuidanceCapsule(state: CameraUiState, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
             )
-            if (cue != null) {
+            if (reason != null) {
                 Icon(
                     Icons.AutoMirrored.Rounded.HelpOutline,
                     stringResource(R.string.cd_why),
@@ -105,9 +113,9 @@ fun GuidanceCapsule(state: CameraUiState, modifier: Modifier = Modifier) {
                 )
             }
         }
-        if (cue != null && showWhy) {
+        if (reason != null && showWhy) {
             Text(
-                stringResource(GuidanceText.reason(cue)),
+                stringResource(reason),
                 color = Color.White,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,

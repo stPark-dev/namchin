@@ -132,14 +132,19 @@
     <string name="part_left_leg">왼다리를</string>
     <string name="part_right_leg">오른다리를</string>
     <string name="part_torso">상체를</string>
+    <string name="part_left_hand">왼손을</string>
+    <string name="part_right_hand">오른손을</string>
+    <string name="part_left_foot">왼발을</string>
+    <string name="part_right_foot">오른발을</string>
     <string name="move_raise">더 올려</string>
     <string name="move_lower">더 내려</string>
     <string name="move_outward">바깥으로 벌려</string>
     <string name="move_inward">몸 쪽으로 모아</string>
     <string name="move_bend">더 굽혀</string>
     <string name="move_straighten">쭉 펴</string>
-    <string name="move_lean_left">화면 왼쪽으로 기울여</string>
-    <string name="move_lean_right">화면 오른쪽으로 기울여</string>
+    <!-- 팔·다리처럼 여자친구 본인 기준 좌우 -->
+    <string name="move_lean_her_left">본인 왼쪽으로 기울여</string>
+    <string name="move_lean_her_right">본인 오른쪽으로 기울여</string>
 
     <!-- "왜?" 한 줄 설명 -->
     <string name="why_hold_steady">어두우면 셔터가 느려져서 조금만 흔들려도 사진이 번져요</string>

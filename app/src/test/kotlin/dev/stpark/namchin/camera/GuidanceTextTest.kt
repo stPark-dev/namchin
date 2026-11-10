@@ -68,4 +68,19 @@ class GuidanceTextTest {
     fun `reasons explain the rule, not repeat the instruction`() {
         assertNotEquals(GuidanceText.spec(Guidance.FeetToBottom).res, GuidanceText.reason(Guidance.FeetToBottom))
     }
+
+    @Test
+    fun `moving a forearm or shin names the hand or foot, bending names the limb`() {
+        assertEquals(R.string.part_left_hand, GuidanceText.spec(Guidance.Pose(BodyPart.LEFT_FOREARM, Direction.RAISE)).args[0])
+        assertEquals(R.string.part_right_foot, GuidanceText.spec(Guidance.Pose(BodyPart.RIGHT_SHIN, Direction.OUTWARD)).args[0])
+        assertEquals(R.string.part_left_arm, GuidanceText.spec(Guidance.Pose(BodyPart.LEFT_FOREARM, Direction.BEND)).args[0])
+        assertEquals(R.string.part_right_leg, GuidanceText.spec(Guidance.Pose(BodyPart.RIGHT_SHIN, Direction.STRAIGHTEN)).args[0])
+    }
+
+    @Test
+    fun `torso lean is said from her side, like the arms`() {
+        // 화면 왼쪽 = 카메라를 보는 그녀의 오른쪽
+        assertEquals(R.string.move_lean_her_right, GuidanceText.spec(Guidance.Pose(BodyPart.LEFT_TORSO, Direction.LEAN_LEFT)).args[1])
+        assertEquals(R.string.move_lean_her_left, GuidanceText.spec(Guidance.Pose(BodyPart.LEFT_TORSO, Direction.LEAN_RIGHT)).args[1])
+    }
 }

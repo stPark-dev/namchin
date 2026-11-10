@@ -17,7 +17,7 @@ object GuidanceText {
 
     fun spec(cue: Guidance): TextSpec = when (cue) {
         is Guidance.Pose -> cue.direction
-            ?.let { TextSpec(R.string.guide_pose_directed, listOf(partObject(cue.part), movement(it))) }
+            ?.let { TextSpec(R.string.guide_pose_directed, listOf(partObject(cue.part, it), movement(it))) }
             ?: TextSpec(posePart(cue.part))
         else -> TextSpec(framing(cue))
     }
@@ -80,14 +80,24 @@ object GuidanceText {
         is Guidance.Pose -> posePart(cue.part)
     }
 
-    /** "왼팔을" 처럼 조사까지 붙은 부위 (방향 안내용). */
+    /**
+     * "왼팔을" 처럼 조사까지 붙은 부위 (방향 안내용).
+     * 아래팔·정강이를 옮기라는 말은 손·발로 (팔 전체를 들면 맞던 위팔까지 움직이므로), 굽히고 펴는 건 팔·다리로.
+     */
     @StringRes
-    private fun partObject(part: BodyPart): Int = when (part) {
-        BodyPart.LEFT_UPPER_ARM, BodyPart.LEFT_FOREARM -> R.string.part_left_arm
-        BodyPart.RIGHT_UPPER_ARM, BodyPart.RIGHT_FOREARM -> R.string.part_right_arm
-        BodyPart.LEFT_THIGH, BodyPart.LEFT_SHIN -> R.string.part_left_leg
-        BodyPart.RIGHT_THIGH, BodyPart.RIGHT_SHIN -> R.string.part_right_leg
-        BodyPart.LEFT_TORSO, BodyPart.RIGHT_TORSO -> R.string.part_torso
+    private fun partObject(part: BodyPart, direction: Direction): Int {
+        val limb = direction == Direction.BEND || direction == Direction.STRAIGHTEN
+        return when (part) {
+            BodyPart.LEFT_UPPER_ARM -> R.string.part_left_arm
+            BodyPart.RIGHT_UPPER_ARM -> R.string.part_right_arm
+            BodyPart.LEFT_FOREARM -> if (limb) R.string.part_left_arm else R.string.part_left_hand
+            BodyPart.RIGHT_FOREARM -> if (limb) R.string.part_right_arm else R.string.part_right_hand
+            BodyPart.LEFT_THIGH -> R.string.part_left_leg
+            BodyPart.RIGHT_THIGH -> R.string.part_right_leg
+            BodyPart.LEFT_SHIN -> if (limb) R.string.part_left_leg else R.string.part_left_foot
+            BodyPart.RIGHT_SHIN -> if (limb) R.string.part_right_leg else R.string.part_right_foot
+            BodyPart.LEFT_TORSO, BodyPart.RIGHT_TORSO -> R.string.part_torso
+        }
     }
 
     @StringRes
@@ -98,8 +108,9 @@ object GuidanceText {
         Direction.INWARD -> R.string.move_inward
         Direction.BEND -> R.string.move_bend
         Direction.STRAIGHTEN -> R.string.move_straighten
-        Direction.LEAN_LEFT -> R.string.move_lean_left
-        Direction.LEAN_RIGHT -> R.string.move_lean_right
+        // 화면 왼쪽 = 카메라를 보는 그녀의 오른쪽 (팔·다리 좌우와 같은 기준으로 말한다)
+        Direction.LEAN_LEFT -> R.string.move_lean_her_right
+        Direction.LEAN_RIGHT -> R.string.move_lean_her_left
     }
 
     /** 방향을 모를 때: 부위만 ("여자친구 왼쪽 아래팔을 레퍼런스처럼") */

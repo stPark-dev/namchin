@@ -20,8 +20,16 @@ class PoseDirectionTest {
         Joint.RIGHT_WRIST to Point(0.25f, 0.30f),
     )
 
-    private fun direction(reference: Map<Joint, Point>, current: Map<Joint, Point>, part: BodyPart, mirrored: Boolean = false) =
-        PoseDirection.of(pose(reference), pose(current), part, mirrored)
+    private fun direction(
+        reference: Map<Joint, Point>,
+        current: Map<Joint, Point>,
+        part: BodyPart,
+        mirrored: Boolean = false,
+        previous: Direction? = null,
+    ) = PoseDirection.of(pose(reference), pose(current), part, mirrored, previous)
+
+    /** 오른팔이 거의 옆(80°)으로 뻗은 레퍼런스: 지금 내린 팔과의 차이가 대각선 근처. */
+    private val rightArmNearlyOut = STANDING.with(Joint.RIGHT_ELBOW to Point(0.3515f, 0.3174f))
 
     @Test
     fun `arm that should be higher is raised`() {
@@ -83,5 +91,52 @@ class PoseDirectionTest {
         val noElbow = STANDING.filterKeys { it != Joint.RIGHT_ELBOW }
 
         assertNull(direction(rightArmOut, noElbow, BodyPart.RIGHT_UPPER_ARM))
+    }
+
+    @Test
+    fun `right arm outward is toward screen left`() {
+        assertEquals(Direction.OUTWARD, direction(rightArmNearlyOut, STANDING, BodyPart.RIGHT_UPPER_ARM))
+    }
+
+    @Test
+    fun `near the diagonal the previous axis is kept`() {
+        assertEquals(
+            Direction.RAISE,
+            direction(rightArmNearlyOut, STANDING, BodyPart.RIGHT_UPPER_ARM, previous = Direction.RAISE),
+        )
+    }
+
+    @Test
+    fun `small bend difference keeps saying bend once started`() {
+        // 무릎을 20°만 더 굽혀야: 처음엔 방향으로, 이미 '굽혀'였으면 계속 '굽혀'
+        val slightlyBent = STANDING.with(Joint.LEFT_ANKLE to Point(0.598f, 0.888f))
+
+        assertEquals(Direction.OUTWARD, direction(slightlyBent, STANDING, BodyPart.LEFT_SHIN))
+        assertEquals(Direction.BEND, direction(slightlyBent, STANDING, BodyPart.LEFT_SHIN, previous = Direction.BEND))
+    }
+
+    @Test
+    fun `mirrored match compares bending with the flipped reference`() {
+        val rightSeated = STANDING.with(
+            Joint.RIGHT_KNEE to Point(0.32f, 0.56f),
+            Joint.RIGHT_ANKLE to Point(0.32f, 0.72f),
+        )
+
+        assertEquals(Direction.BEND, direction(rightSeated, STANDING, BodyPart.LEFT_SHIN, mirrored = true))
+    }
+
+    @Test
+    fun `barely leaning torso gives no lean direction unless already leaning`() {
+        val barely = STANDING.with(Joint.LEFT_SHOULDER to Point(0.552f, 0.30f))
+
+        assertNull(direction(barely, STANDING, BodyPart.LEFT_TORSO))
+        assertEquals(Direction.LEAN_LEFT, direction(barely, STANDING, BodyPart.LEFT_TORSO, previous = Direction.LEAN_LEFT))
+    }
+
+    @Test
+    fun `unknown when a segment has no length`() {
+        val collapsed = STANDING.with(Joint.RIGHT_ELBOW to Point(0.45f, 0.30f))
+
+        assertNull(direction(rightArmOut, collapsed, BodyPart.RIGHT_UPPER_ARM))
     }
 }
