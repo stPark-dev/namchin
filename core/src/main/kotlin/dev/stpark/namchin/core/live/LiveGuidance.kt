@@ -8,6 +8,7 @@ import dev.stpark.namchin.core.guidance.GuidancePrioritizer
 import dev.stpark.namchin.core.guidance.GuidanceState
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.pose.PoseMatch
+import dev.stpark.namchin.core.pose.PoseDirection
 import dev.stpark.namchin.core.pose.PoseSimilarity
 import dev.stpark.namchin.core.shutter.Alignment
 import dev.stpark.namchin.core.shutter.AutoShutter
@@ -101,7 +102,13 @@ object LiveGuidance {
         val match = input.current
             ?.takeIf { poseEnabled }
             ?.let { PoseSimilarity.compare(input.reference, it, state.preferMirrored) }
-        val alignment = Alignment.evaluate(framingCues, match, poseEnabled)
+        val alignment = Alignment.evaluate(framingCues, match, poseEnabled).let { a ->
+            // 포즈 안내에 "어떻게" 고칠지 붙인다
+            val current = input.current
+            if (current == null || match == null) a else a.copy(cues = a.cues.map { cue ->
+                if (cue is Guidance.Pose) cue.copy(direction = PoseDirection.of(input.reference, current, cue.part, match.mirrored)) else cue
+            })
+        }
         // 인물이 없어도 수평은 미리 맞출 수 있게 함께 낸다
         val cues = holdSteady(input.lowLight, input.shaky) +
             if (framingCues == null) alignment.cues + listOfNotNull(levelCue) else alignment.cues

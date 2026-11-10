@@ -1,6 +1,7 @@
 package dev.stpark.namchin.core.guidance
 
 import dev.stpark.namchin.core.model.BodyPart
+import dev.stpark.namchin.core.pose.PoseDirection
 
 enum class Rotation { CLOCKWISE, COUNTERCLOCKWISE }
 
@@ -18,7 +19,8 @@ sealed class Guidance(val priority: Int) {
     data object TiltDown : Guidance(3)
     data object PanLeft : Guidance(4)
     data object PanRight : Guidance(4)
-    data class Pose(val part: BodyPart) : Guidance(5)
+    /** @property direction 어떻게 고칠지 (관절이 안 보이면 null → 부위만 안내) */
+    data class Pose(val part: BodyPart, val direction: PoseDirection.Direction? = null) : Guidance(5)
 
     // 기본 모드 구도 코칭
     enum class CutPoint { ANKLE, KNEE, WRIST }

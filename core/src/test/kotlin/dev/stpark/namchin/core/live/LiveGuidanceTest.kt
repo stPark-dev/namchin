@@ -260,4 +260,12 @@ class LiveGuidanceTest {
 
         assertFalse(Guidance.HoldSteady in out.cues)
     }
+
+    @Test
+    fun `pose cue says which way to move`() {
+        val (_, out) = step(pose(STANDING)) // 레퍼런스는 오른팔 수평, 지금은 내림
+
+        val cue = out.display as Guidance.Pose
+        assertEquals(dev.stpark.namchin.core.pose.PoseDirection.Direction.RAISE, cue.direction)
+    }
 }

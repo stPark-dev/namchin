@@ -257,7 +257,7 @@ private fun CameraContent(
     LaunchedEffect(vm) {
         vm.feedback.collect { event ->
             when (event) {
-                is Feedback.Speak -> voice.speak(context.getString(GuidanceText.of(event.cue)))
+                is Feedback.Speak -> voice.speak(GuidanceText.text(context, event.cue))
                 Feedback.Tick -> haptics.tick()
                 Feedback.AlignedBuzz -> haptics.aligned()
                 Feedback.Fire -> if (!currentCanShoot) vm.onFireRejected() else currentShoot(BURST_COUNT)

@@ -124,4 +124,35 @@
     <string name="color_saving">색감 입혀 저장 중…</string>
     <string name="color_saved">색감 입힌 사진을 따로 저장했어요</string>
     <string name="color_save_failed">색감 사진을 저장하지 못했어요</string>
+
+    <!-- 포즈 방향 안내: "[부위를] [동작] 달라고 하세요" -->
+    <string name="guide_pose_directed">%1$s %2$s 달라고 하세요</string>
+    <string name="part_left_arm">왼팔을</string>
+    <string name="part_right_arm">오른팔을</string>
+    <string name="part_left_leg">왼다리를</string>
+    <string name="part_right_leg">오른다리를</string>
+    <string name="part_torso">상체를</string>
+    <string name="move_raise">더 올려</string>
+    <string name="move_lower">더 내려</string>
+    <string name="move_outward">바깥으로 벌려</string>
+    <string name="move_inward">몸 쪽으로 모아</string>
+    <string name="move_bend">더 굽혀</string>
+    <string name="move_straighten">쭉 펴</string>
+    <string name="move_lean_left">화면 왼쪽으로 기울여</string>
+    <string name="move_lean_right">화면 오른쪽으로 기울여</string>
+
+    <!-- "왜?" 한 줄 설명 -->
+    <string name="why_hold_steady">어두우면 셔터가 느려져서 조금만 흔들려도 사진이 번져요</string>
+    <string name="why_no_person">어깨와 골반이 보여야 위치와 크기를 잴 수 있어요</string>
+    <string name="why_level">수평이 기울면 사진 전체가 불안해 보여요</string>
+    <string name="why_distance">레퍼런스와 같은 크기로 담아야 같은 느낌이 나요</string>
+    <string name="why_tilt">인물 높이가 레퍼런스와 같아야 구도가 맞아요</string>
+    <string name="why_pan">인물 위치를 맞추면 배경 배치도 레퍼런스와 같아져요</string>
+    <string name="why_pose">가장 많이 다른 부분부터 맞추면 빨리 비슷해져요</string>
+    <string name="why_head_cut">정수리가 잘리면 답답해 보여요. 머리 위에 살짝 여백을 두세요</string>
+    <string name="why_feet">폰을 낮추고 발끝을 화면 끝에 두면 다리가 길어 보여요</string>
+    <string name="why_headroom">머리 위가 너무 비면 인물이 작고 가라앉아 보여요</string>
+    <string name="why_cut">관절에서 잘리면 팔다리가 잘려 나간 것처럼 어색해 보여요</string>
+    <string name="why_gaze">보는 방향에 여백이 있어야 시선이 자연스럽게 이어져요</string>
+    <string name="cd_why">왜 이렇게 하나요</string>
 </resources>

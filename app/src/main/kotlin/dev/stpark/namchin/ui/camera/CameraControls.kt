@@ -14,6 +14,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -30,6 +31,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,35 +59,64 @@ import dev.stpark.namchin.ui.theme.Brand
 private val Glass = Brand.Ink.copy(alpha = 0.55f)
 private val GlassBorder = Color.White.copy(alpha = 0.14f)
 
-/** 미리보기 위쪽 안내 캡슐. 맞으면 체크 아이콘과 노란 글씨. */
+/**
+ * 미리보기 위쪽 안내 캡슐. 맞으면 체크 아이콘과 노란 글씨.
+ * 안내가 있을 때 캡슐을 누르면 "왜?" 한 줄이 아래에 펼쳐진다 (안내가 바뀌면 접힘).
+ */
 @Composable
 fun GuidanceCapsule(state: CameraUiState, modifier: Modifier = Modifier) {
     val output = state.output
     val display = output?.display
     val aligned = output?.aligned == true && display == null
+    val noPose = state.reference != null && state.reference.pose == null
     val text = when {
-        state.reference != null && state.reference.pose == null -> stringResource(R.string.camera_no_reference_pose)
-        display != null -> stringResource(GuidanceText.of(display))
+        noPose -> stringResource(R.string.camera_no_reference_pose)
+        display != null -> GuidanceText.text(display)
         aligned -> stringResource(R.string.camera_aligned)
         else -> return
     }
-    Row(
-        modifier
-            .clip(RoundedCornerShape(50))
-            .background(Glass)
-            .border(1.dp, GlassBorder, RoundedCornerShape(50))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (aligned) Icon(Icons.Rounded.CheckCircle, null, tint = Brand.Yellow, modifier = Modifier.size(18.dp))
-        Text(
-            text,
-            color = if (aligned) Brand.Yellow else Color.White,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-        )
+    val cue = display.takeUnless { noPose }
+    var showWhy by remember(cue) { mutableStateOf(false) }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(Glass)
+                .border(1.dp, GlassBorder, RoundedCornerShape(50))
+                .then(if (cue != null) Modifier.clickable { showWhy = !showWhy } else Modifier)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (aligned) Icon(Icons.Rounded.CheckCircle, null, tint = Brand.Yellow, modifier = Modifier.size(18.dp))
+            Text(
+                text,
+                color = if (aligned) Brand.Yellow else Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            if (cue != null) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.HelpOutline,
+                    stringResource(R.string.cd_why),
+                    tint = if (showWhy) Brand.Yellow else Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        if (cue != null && showWhy) {
+            Text(
+                stringResource(GuidanceText.reason(cue)),
+                color = Color.White,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Glass)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
     }
 }
 
