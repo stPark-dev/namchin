@@ -31,6 +31,7 @@ class LivePoseAnalyzer(
     private val analysisExecutor: Executor,
     private val onFrame: (PoseFrame) -> Unit,
 ) : ImageAnalysis.Analyzer, AutoCloseable {
+    private val closeExecutor = FallbackExecutor(analysisExecutor)
     private val detector = PoseDetection.getClient(
         AccuratePoseDetectorOptions.Builder()
             .setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE)
@@ -58,7 +59,7 @@ class LivePoseAnalyzer(
                 }
                 onFrame(PoseFrame(landmarks, width, height, SystemClock.elapsedRealtime() - start))
             }
-            .addOnCompleteListener(analysisExecutor) { proxy.close() }
+            .addOnCompleteListener(closeExecutor) { proxy.close() }
     }
 
     override fun close() = detector.close()
