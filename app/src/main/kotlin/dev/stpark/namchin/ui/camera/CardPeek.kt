@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.stpark.namchin.R
 import dev.stpark.namchin.data.Reference
@@ -191,7 +192,9 @@ fun PeekOverlay(state: CardPeekState, onApply: () -> Unit, modifier: Modifier = 
         val cur = PeekMath.lerp(PeekMath.lerp(from, target, p), chip, fly)
         ReferenceCard(
             reference,
-            Modifier
+            // 손패 크기에서 커지므로 처음부터 크게 열린 크기로 불러온다 (작게 불러와 늘리면 흐려짐)
+            loadSize = IntSize(target.width.roundToInt(), target.height.roundToInt()),
+            modifier = Modifier
                 .offset { IntOffset(cur.left.roundToInt(), cur.top.roundToInt()) }
                 .size(with(density) { cur.width.toDp() }, with(density) { cur.height.toDp() })
                 .rotate(state.fromRotation * (1f - p))

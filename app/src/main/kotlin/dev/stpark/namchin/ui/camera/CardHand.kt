@@ -47,6 +47,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.stpark.namchin.ui.theme.Brand
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
+import coil3.request.ImageRequest
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draw.alpha
@@ -70,9 +73,21 @@ private val CARD_SHAPE = RoundedCornerShape(10.dp)
 private const val SWIPE_UP_THRESHOLD_PX = 60f
 
 @Composable
-fun ReferenceCard(reference: Reference, modifier: Modifier = Modifier) {
+/**
+ * @param loadSize 이미지를 이 픽셀 크기로 불러온다. 없으면 처음 그려질 때의 크기에 맞춘다
+ *   (크기가 커지는 애니메이션에선 작게 불러와 늘어나 흐려지므로 최종 크기를 넘긴다)
+ */
+fun ReferenceCard(reference: Reference, modifier: Modifier = Modifier, loadSize: IntSize? = null) {
+    val context = LocalContext.current
+    val model = remember(reference.imagePath, loadSize) {
+        if (loadSize == null) {
+            File(reference.imagePath)
+        } else {
+            ImageRequest.Builder(context).data(File(reference.imagePath)).size(loadSize.width, loadSize.height).build()
+        }
+    }
     AsyncImage(
-        model = File(reference.imagePath),
+        model = model,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = modifier
