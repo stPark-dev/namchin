@@ -47,6 +47,9 @@ data class CameraUiState(
     val cardOrder: List<Long>? = null,
     /** 어두움(야간): 포즈 비교·자동 셔터 꺼짐 */
     val lowLight: Boolean = false,
+    /** 개발용 표시: 화면 밝기, 카메라 감도×노출시간 */
+    val brightness: Float = 0f,
+    val exposure: Float? = null,
 )
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
@@ -72,7 +75,12 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         lastFrameAt = 0L
         wasAligned = false
         // 카드를 바꿔도 장면 기준 카드 순서는 유지 (다음 장면 분석까지 원래 순서로 튀지 않게)
-        _state.value = CameraUiState(reference = reference, settings = _state.value.settings, cardOrder = _state.value.cardOrder)
+        _state.value = CameraUiState(
+            reference = reference,
+            settings = _state.value.settings,
+            cardOrder = _state.value.cardOrder,
+            lowLight = lowLight.lowLight,
+        )
     }
 
     fun updateSettings(settings: FeedbackSettings) = _state.update { it.copy(settings = settings) }
@@ -122,8 +130,15 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onTilt(degrees: Float?) = _state.update { it.copy(rollDegrees = degrees) }
 
-    fun onGyro(angularSpeed: Float) {
-        shake = Shake.step(shake, angularSpeed)
+    fun onGyro(sample: GyroSample) {
+        shake = Shake.step(shake, sample.speed, sample.timeMs)
+    }
+
+    /** 카메라가 실제로 쓰는 ISO × 노출 시간(초). 카메라 스레드에서 들어온다. */
+    @Volatile private var exposure: Float? = null
+
+    fun onExposure(isoTimesSeconds: Float) {
+        exposure = isoTimesSeconds
     }
 
     fun onFrame(frame: PoseFrame) {
@@ -136,7 +151,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             .let { if (it == snapshot.region) snapshot.region else it }
         val current = MlKitPoseMapper.toPersonPose(frame.landmarks, frame.width, frame.height)
             ?.let { CropRegion.remap(it, region) }
-        lowLight = LowLight.step(lowLight, frame.brightness, now)
+        lowLight = LowLight.step(lowLight, frame.brightness, exposure, now)
         val dark = lowLight.lowLight
         val refPose = reference?.pose
         val (next, output) = when {
@@ -166,6 +181,8 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 region = region,
                 lowLight = dark,
+                brightness = frame.brightness,
+                exposure = exposure,
                 current = current,
                 output = output,
                 analysisMs = frame.analysisMs,

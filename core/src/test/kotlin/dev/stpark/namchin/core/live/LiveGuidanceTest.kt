@@ -232,6 +232,8 @@ class LiveGuidanceTest {
 
         assertNull(first.match)
         assertFalse(held.fire)
+        // 포즈를 비교하지 않으므로 "맞음"(초록·진동·'그대로 유지')도 내지 않는다
+        assertFalse(held.aligned)
         assertFalse(first.cues.any { it is Guidance.Pose })
     }
 

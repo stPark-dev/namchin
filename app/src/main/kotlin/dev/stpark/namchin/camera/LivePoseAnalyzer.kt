@@ -53,7 +53,8 @@ class LivePoseAnalyzer(
         val width = if (upright) proxy.height else proxy.width
         val height = if (upright) proxy.width else proxy.height
         val start = SystemClock.elapsedRealtime()
-        val brightness = meanLuma(proxy)
+        // 예상 못 한 형식이라도 프레임 해제가 막히지 않게
+        val brightness = runCatching { meanLuma(proxy) }.getOrDefault(NEUTRAL_LUMA)
         if (start - lastSceneAt >= SCENE_INTERVAL_MS) {
             lastSceneAt = start
             runCatching { onScene(sceneBitmap(proxy, rotation)) }.onFailure { Log.w(TAG, "장면 프레임 실패", it) }
@@ -108,5 +109,6 @@ class LivePoseAnalyzer(
         const val SCENE_INTERVAL_MS = 2_000L
         const val SCENE_SIZE = 256
         const val LUMA_STEP = 16
+        const val NEUTRAL_LUMA = 128f
     }
 }

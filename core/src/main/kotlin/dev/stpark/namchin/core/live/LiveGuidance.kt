@@ -107,7 +107,8 @@ object LiveGuidance {
             if (framingCues == null) alignment.cues + listOfNotNull(levelCue) else alignment.cues
         val hasConstraint = referenceFrame != null || match != null
         val decision = GuidancePrioritizer.decide(cues, state.guidance, input.nowMs)
-        val aligned = alignment.aligned && hasConstraint
+        // 야간엔 포즈를 비교하지 않으므로 "맞음"(초록·진동·'그대로 유지')을 내지 않는다
+        val aligned = alignment.aligned && hasConstraint && !input.lowLight
         val shutter = AutoShutter.step(state.shutter, aligned, input.autoShutter && !input.lowLight, input.nowMs)
 
         val nextState = LiveState(

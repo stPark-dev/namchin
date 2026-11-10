@@ -54,6 +54,7 @@ private val ANALYSIS_SIZE = Size(1280, 960)
 fun CameraPreview(
     onFrame: (PoseFrame) -> Unit,
     onScene: (Bitmap) -> Unit,
+    onExposure: (Float) -> Unit,
     onCameraReady: (Camera, ImageCapture) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -64,6 +65,7 @@ fun CameraPreview(
     }
     val currentOnFrame by rememberUpdatedState(onFrame)
     val currentOnScene by rememberUpdatedState(onScene)
+    val currentOnExposure by rememberUpdatedState(onExposure)
     val currentOnCameraReady by rememberUpdatedState(onCameraReady)
     var failed by remember { mutableStateOf(false) }
 
@@ -81,7 +83,7 @@ fun CameraPreview(
                 val ratio = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
                 val preview = Preview.Builder().setResolutionSelector(ratio.build())
-                    .also(::logActiveLens)
+                    .also { monitorCapture(it) { exposure -> currentOnExposure(exposure) } }
                     .build()
                     .also { it.surfaceProvider = previewView.surfaceProvider }
                 val analysis = ImageAnalysis.Builder()
@@ -136,11 +138,15 @@ fun CameraPreview(
 }
 
 private const val TAG = "CameraPreview"
+private const val NANOS_PER_SECOND = 1_000_000_000f
 
-/** 줌에 따라 실제로 어느 물리 렌즈(초광각/기본/망원)가 쓰이는지 로그로 남긴다. */
+/**
+ * 프레임마다: 카메라가 쓰는 감도×노출시간(야간 판정)을 알리고,
+ * 줌에 따라 실제로 어느 물리 렌즈(초광각/기본/망원)가 쓰이는지 로그로 남긴다.
+ */
 @SuppressLint("UnsafeOptInUsageError")
 @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
-private fun logActiveLens(builder: Preview.Builder) {
+private fun monitorCapture(builder: Preview.Builder, onExposure: (Float) -> Unit) {
     var lastLens: String? = null
     Camera2Interop.Extender(builder).setSessionCaptureCallback(
         object : CameraCaptureSession.CaptureCallback() {
@@ -149,6 +155,9 @@ private fun logActiveLens(builder: Preview.Builder) {
                 request: CaptureRequest,
                 result: TotalCaptureResult,
             ) {
+                val iso = result.get(CaptureResult.SENSOR_SENSITIVITY)
+                val exposureNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME)
+                if (iso != null && exposureNs != null) onExposure(iso * (exposureNs / NANOS_PER_SECOND))
                 val lens = result.get(CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID)
                 if (lens != lastLens) {
                     lastLens = lens

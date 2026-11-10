@@ -283,6 +283,7 @@ private fun CameraContent(
                 CameraPreview(
                     onFrame = vm::onFrame,
                     onScene = vm::onSceneFrame,
+                    onExposure = vm::onExposure,
                     onCameraReady = { cam, capture ->
                         camera = cam
                         imageCapture = capture
@@ -349,6 +350,8 @@ private fun CameraContent(
                             state.analysisMs.toInt(),
                             state.fps,
                             state.output?.match?.let { "%.2f".format(it.score) } ?: "-",
+                            state.brightness,
+                            state.exposure ?: 0f,
                         ),
                         color = Color.White.copy(alpha = 0.5f),
                         fontSize = 10.sp,

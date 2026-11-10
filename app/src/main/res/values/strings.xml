@@ -31,7 +31,7 @@
     <string name="camera_aligned">좋아요! 그대로 유지</string>
     <string name="camera_no_reference_pose">레퍼런스에서 인물을 찾지 못해 안내를 할 수 없어요.</string>
     <string name="camera_error">카메라를 열지 못했어요.</string>
-    <string name="camera_stats">분석 %1$dms · %2$.0f fps · 포즈 %3$s</string>
+    <string name="camera_stats">분석 %1$dms · %2$.0f fps · 포즈 %3$s · 밝기 %4$.0f · 노출 %5$.0f</string>
 
     <string name="guide_no_person">여자친구 어깨까지 화면에 담아주세요</string>
     <string name="guide_level_cw">폰을 시계 방향으로 살짝 돌려 수평을 맞추세요</string>
@@ -116,6 +116,6 @@
     <string name="tags_confirm">이대로 확정</string>
     <string name="deck_filter_all">전체</string>
 
-    <string name="guide_hold_steady">어두워서 흔들리기 쉬워요. 폰을 두 손으로 단단히 잡으세요</string>
+    <string name="guide_hold_steady">두 손으로 단단히 잡으세요</string>
     <string name="camera_night">야간 · 포즈 비교 꺼짐</string>
 </resources>
