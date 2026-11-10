@@ -1,3 +1,26 @@
 <resources>
     <string name="app_name">남친렌즈</string>
+    <string name="share_label">남친렌즈 레퍼런스로 저장</string>
+    <string name="home_add_reference">레퍼런스 추가</string>
+    <string name="home_empty">아직 레퍼런스가 없어요.\n인스타에서 사진을 공유하거나 아래 버튼으로 추가하세요.</string>
+    <string name="crop_auto_detected">사진 영역을 자동으로 찾았어요. 모서리를 끌어 조정할 수 있어요.</string>
+    <string name="crop_auto_failed">사진 영역을 찾지 못했어요. 모서리를 끌어 직접 맞춰주세요.</string>
+    <string name="crop_confirm">이 영역으로 저장</string>
+    <string name="import_analyzing">포즈 분석 중…</string>
+    <string name="import_error_load">이미지를 불러오지 못했어요.</string>
+    <string name="import_error_analyze">분석이나 저장에 실패했어요.</string>
+    <string name="detail_title">레퍼런스</string>
+    <string name="detail_delete_confirm">이 레퍼런스를 삭제할까요?</string>
+    <string name="profile_person">인물 인식: %1$s</string>
+    <string name="profile_pose">포즈 비교: %1$s (비교 가능한 마디 %2$d/10)</string>
+    <string name="profile_size_basis">거리 기준: %1$s</string>
+    <string name="profile_size">크기: %1$d × %2$d</string>
+    <string name="size_basis_torso">몸통 길이</string>
+    <string name="size_basis_neck">목 길이 (클로즈업)</string>
+    <string name="size_basis_none">없음 (구도 안내 불가)</string>
+    <string name="yes">가능</string>
+    <string name="no">불가</string>
+    <string name="back">뒤로</string>
+    <string name="cancel">취소</string>
+    <string name="delete">삭제</string>
 </resources>

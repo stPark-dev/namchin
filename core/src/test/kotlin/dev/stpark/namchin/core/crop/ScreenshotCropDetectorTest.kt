@@ -72,6 +72,13 @@ class ScreenshotCropDetectorTest {
     }
 
     @Test
+    fun `an image not shaped like a phone screen is used whole even with dark bands`() {
+        val photo = LumaImage(80, 100, IntArray(80 * 100) { if (it / 80 < 10) 0 else photo() })
+
+        assertEquals(CropRect(0, 0, 80, 100), ScreenshotCropDetector.detect(photo))
+    }
+
+    @Test
     fun `all UI returns null`() {
         assertNull(ScreenshotCropDetector.detect(image { x, _ -> lightUi(x) }))
     }

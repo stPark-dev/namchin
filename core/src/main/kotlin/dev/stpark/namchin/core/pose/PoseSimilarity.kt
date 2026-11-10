@@ -34,8 +34,11 @@ object PoseSimilarity {
     private const val MAX_ANGLE_DIFF = PI / 2
 
     /** 레퍼런스가 포즈 비교에 쓸 만한지. false면 포즈 매칭을 끄고 구도만 본다. */
-    fun isComparable(reference: PersonPose): Boolean =
-        BodyPart.entries.count { angleOf(reference, it, flip = false) != null } >= MIN_PARTS
+    fun isComparable(reference: PersonPose): Boolean = comparablePartCount(reference) >= MIN_PARTS
+
+    /** 신뢰도 높은 양 끝 관절이 있는 마디 수. */
+    fun comparablePartCount(pose: PersonPose): Int =
+        BodyPart.entries.count { angleOf(pose, it, flip = false) != null }
 
     fun compare(reference: PersonPose, current: PersonPose, preferMirrored: Boolean = false): PoseMatch? {
         if (!isComparable(reference)) return null

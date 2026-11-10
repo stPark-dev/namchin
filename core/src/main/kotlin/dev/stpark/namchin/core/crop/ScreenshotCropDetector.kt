@@ -15,6 +15,7 @@ data class CropRect(val left: Int, val top: Int, val right: Int, val bottom: Int
 /**
  * 인스타 캡처에서 사진 영역을 찾는다.
  * 앱 UI는 흰색(라이트) 또는 검은색(다크) 배경이 대부분인 줄이라는 점을 이용한다.
+ * 휴대폰 화면처럼 세로로 긴 이미지만 캡처로 본다. 일반 사진은 항상 전체를 쓴다.
  * 잘라낸 영역이 인스타 비율이 아니면(밤하늘 등 어두운 띠에 잘린 경우) null → 수동 크롭.
  */
 object ScreenshotCropDetector {
@@ -25,10 +26,15 @@ object ScreenshotCropDetector {
     const val GAP_TOLERANCE_RATIO = 0.02f
     const val RATIO_TOLERANCE = 0.04f
 
+    /** 가로/세로가 이보다 작으면 휴대폰 화면 캡처로 본다 (S23: 1080/2340 ≈ 0.46). */
+    const val SCREENSHOT_MAX_RATIO = 0.6f
+
     /** 인스타 게시물/스토리 비율 (가로/세로): 1:1, 4:5, 3:4, 1.91:1, 9:16. */
     val INSTAGRAM_RATIOS = listOf(1f, 4f / 5f, 3f / 4f, 1.91f, 9f / 16f)
 
     fun detect(image: LumaImage): CropRect? {
+        val whole = CropRect(0, 0, image.width, image.height)
+        if (image.width.toFloat() / image.height >= SCREENSHOT_MAX_RATIO) return whole
         val rowIsPhoto = BooleanArray(image.height) { y ->
             !isUi(IntArray(image.width) { x -> image[x, y] })
         }
