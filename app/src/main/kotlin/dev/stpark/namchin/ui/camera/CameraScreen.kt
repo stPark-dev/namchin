@@ -46,6 +46,7 @@ import dev.stpark.namchin.camera.Feedback
 import dev.stpark.namchin.camera.FeedbackSettings
 import dev.stpark.namchin.camera.GuideVoice
 import dev.stpark.namchin.camera.Haptics
+import dev.stpark.namchin.settings.AppSettingsStore
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.LifecycleEventObserver
@@ -89,6 +90,7 @@ fun CameraScreen(
     references: List<Reference>?,
     onSelectReference: (Long?) -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     var granted by remember {
@@ -99,7 +101,7 @@ fun CameraScreen(
 
     Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
         if (granted) {
-            CameraContent(referenceId, references, onSelectReference, onOpenLibrary)
+            CameraContent(referenceId, references, onSelectReference, onOpenLibrary, onOpenSettings)
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -121,9 +123,11 @@ private fun CameraContent(
     references: List<Reference>?,
     onSelectReference: (Long?) -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
+    val appSettings by remember { AppSettingsStore.get(context) }.settings.collectAsStateWithLifecycle()
     val all = references.orEmpty()
     val vm: CameraViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -185,7 +189,7 @@ private fun CameraContent(
         flash = true
         vm.onShot()
         if (state.settings.vibrate) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        PhotoSaver.takeBurst(context, capture, count, isActive = { screenActive.get() }) { saved ->
+        PhotoSaver.takeBurst(context, capture, count, appSettings.shutterSound, isActive = { screenActive.get() }) { saved ->
             capturing = false
             message = when {
                 saved == 0 -> R.string.camera_save_failed
@@ -226,6 +230,7 @@ private fun CameraContent(
             ) {
                 if (reference != null) AppliedReferenceChip(reference, onClear = { onSelectReference(null) })
                 GuidanceBanner(state, Modifier.weight(1f))
+                TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_title)) }
             }
             Box(
                 Modifier
@@ -248,6 +253,7 @@ private fun CameraContent(
                     modifier = Modifier.fillMaxSize(),
                 )
                 val region = state.region
+                if (region != null && appSettings.grid) GridOverlay(region, Modifier.fillMaxSize())
                 if (region != null) {
                     if (reference != null) StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
                     LiveSkeleton(state.current, region, state.output?.aligned == true, Modifier.fillMaxSize())

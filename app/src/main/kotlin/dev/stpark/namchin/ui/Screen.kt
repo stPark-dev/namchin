@@ -10,6 +10,8 @@ sealed interface Screen {
     /** 레퍼런스 관리 (목록·추가·삭제). */
     data object Library : Screen
 
+    data object Settings : Screen
+
     /** @property token 가져오기 작업마다 고유. 같은 사진을 다시 골라도 새 작업으로 구분한다. */
     data class Import(val uri: String, val token: String) : Screen {
         companion object {
@@ -23,6 +25,7 @@ sealed interface Screen {
         fun save(screen: Screen): List<String> = when (screen) {
             is Camera -> listOf("Camera", screen.referenceId?.toString().orEmpty())
             Library -> listOf("Library")
+            Settings -> listOf("Settings")
             is Import -> listOf("Import", screen.uri, screen.token)
             is Detail -> listOf("Detail", screen.id.toString())
         }
@@ -32,6 +35,7 @@ sealed interface Screen {
                 if (id.isEmpty()) Camera(null) else id.toLongOrNull()?.let { Camera(it) }
             }
             "Library" -> Library
+            "Settings" -> Settings
             "Import" -> if (saved.size == 3) Import(saved[1], saved[2]) else null
             "Detail" -> saved.getOrNull(1)?.toLongOrNull()?.let { Detail(it) }
             else -> null

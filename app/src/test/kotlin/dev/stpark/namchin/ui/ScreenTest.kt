@@ -11,6 +11,7 @@ class ScreenTest {
         listOf(
             Screen.Camera(referenceId = null),
             Screen.Library,
+            Screen.Settings,
             Screen.Import(uri = "content://media/picker/0/x/1", token = "abc"),
             Screen.Detail(id = 42),
             Screen.Camera(referenceId = 7),

@@ -2,7 +2,6 @@ package dev.stpark.namchin.capture
 
 import android.content.ContentValues
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.media.MediaActionSound
 import android.provider.MediaStore
@@ -18,21 +17,21 @@ object PhotoSaver {
     private val sound by lazy { MediaActionSound().apply { load(MediaActionSound.SHUTTER_CLICK) } }
 
     /**
-     * count장을 차례로 찍는다. 각 장마다 셔터음(국내 규정).
+     * count장을 차례로 찍는다. playSound면 각 장마다 셔터음.
      * 실패하거나 isActive()가 false가 되면(화면 이탈) 멈춘다. 결과는 저장된 장 수.
      */
     fun takeBurst(
         context: Context,
         capture: ImageCapture,
         count: Int,
+        playSound: Boolean,
         isActive: () -> Boolean,
         onDone: (saved: Int) -> Unit,
-    ) = Burst.run(count, isActive, { done -> take(context, capture) { uri -> done(uri != null) } }, onDone)
+    ) = Burst.run(count, isActive, { done -> take(context, capture, playSound) { uri -> done(uri != null) } }, onDone)
 
-    fun take(context: Context, capture: ImageCapture, onResult: (Uri?) -> Unit) {
-        // 개발(디버그) 빌드에서는 셔터음을 끈다. 릴리스 빌드에서는 항상 울린다
-        val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-        if (!debuggable) sound.play(MediaActionSound.SHUTTER_CLICK)
+    /** @param playSound 설정 화면의 셔터음 켬/끔 */
+    fun take(context: Context, capture: ImageCapture, playSound: Boolean, onResult: (Uri?) -> Unit) {
+        if (playSound) sound.play(MediaActionSound.SHUTTER_CLICK)
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, CaptureNaming.displayName(System.currentTimeMillis()))
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")

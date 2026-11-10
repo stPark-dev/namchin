@@ -27,6 +27,7 @@ private val DIM = Color(0xAA000000)
 private val TARGET = Color(0xCCFFFFFF)
 private val CURRENT = Color(0xFFFFD600)
 private val ALIGNED = Color(0xFF00E676)
+private val GRID = Color(0x99FFFFFF)
 
 /** region 위치에 내용을 배치한다 (4:3 프리뷰 박스 기준). */
 @Composable
@@ -74,6 +75,22 @@ fun StaticGuide(reference: Reference, region: Region, ghostAlpha: Float, modifie
 fun LiveSkeleton(current: PersonPose?, region: Region, aligned: Boolean, modifier: Modifier = Modifier) {
     InRegion(region, modifier) {
         SkeletonOverlay(current, Modifier.fillMaxSize(), stroke = 3.dp, color = if (aligned) ALIGNED else CURRENT)
+    }
+}
+
+/** 찍힐 영역의 삼분할 격자. */
+@Composable
+fun GridOverlay(region: Region, modifier: Modifier = Modifier) {
+    InRegion(region, modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 1.dp.toPx()
+            for (i in 1..2) {
+                val x = size.width * i / 3
+                val y = size.height * i / 3
+                drawLine(GRID, Offset(x, 0f), Offset(x, size.height), stroke)
+                drawLine(GRID, Offset(0f, y), Offset(size.width, y), stroke)
+            }
+        }
     }
 }
 

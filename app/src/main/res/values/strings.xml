@@ -78,4 +78,10 @@
     <string name="toggle_voice">음성</string>
     <string name="toggle_vibrate">진동</string>
     <string name="toggle_auto">자동 셔터</string>
+
+    <string name="settings_title">설정</string>
+    <string name="settings_shutter_sound">셔터음</string>
+    <string name="settings_shutter_sound_desc">촬영할 때 찰칵 소리를 냅니다</string>
+    <string name="settings_grid">격자</string>
+    <string name="settings_grid_desc">찍힐 영역에 삼분할 선을 표시합니다</string>
 </resources>

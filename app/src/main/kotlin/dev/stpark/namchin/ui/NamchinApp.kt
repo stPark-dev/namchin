@@ -18,7 +18,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import dev.stpark.namchin.settings.AppSettingsStore
 import dev.stpark.namchin.ui.camera.CameraScreen
+import dev.stpark.namchin.ui.settings.SettingsScreen
 import dev.stpark.namchin.ui.home.HomeScreen
 import dev.stpark.namchin.ui.home.ReferencesViewModel
 import dev.stpark.namchin.ui.importer.ImportRoute
@@ -32,6 +36,7 @@ private val ScreenSaver = listSaver<Screen, String>(
 /** @param sharedUri 다른 앱에서 공유로 받은 이미지 (처리 후 onSharedConsumed 호출) */
 @Composable
 fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
+    val context = LocalContext.current
     var screen by rememberSaveable(stateSaver = ScreenSaver) { mutableStateOf<Screen>(Screen.Camera()) }
     // 관리 화면에 다녀와도 적용 중이던 레퍼런스를 유지한다
     var cameraReferenceId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -71,7 +76,13 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
                     references = references,
                     onSelectReference = ::toCamera,
                     onOpenLibrary = { screen = Screen.Library },
+                    onOpenSettings = { screen = Screen.Settings },
                 )
+            }
+            Screen.Settings -> {
+                val store = remember { AppSettingsStore.get(context) }
+                val settings by store.settings.collectAsStateWithLifecycle()
+                SettingsScreen(settings = settings, onChange = store::update, onBack = { toCamera() })
             }
             Screen.Library -> HomeScreen(
                 references = references,
