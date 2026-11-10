@@ -14,8 +14,11 @@ class AppSettingsStoreTest {
     }
 
     @Test
-    fun `defaults are shutter sound on and grid off`() {
-        assertEquals(AppSettings(shutterSound = true, grid = false), AppSettingsStore(MemoryStore()).settings.value)
+    fun `defaults are shutter sound on, grid off, debug info hidden`() {
+        assertEquals(
+            AppSettings(shutterSound = true, grid = false, debugInfo = false),
+            AppSettingsStore(MemoryStore()).settings.value,
+        )
     }
 
     @Test
@@ -23,9 +26,10 @@ class AppSettingsStoreTest {
         val memory = MemoryStore()
         val store = AppSettingsStore(memory)
 
-        store.update(AppSettings(shutterSound = false, grid = true))
+        val changed = AppSettings(shutterSound = false, grid = true, debugInfo = true)
+        store.update(changed)
 
-        assertEquals(AppSettings(shutterSound = false, grid = true), store.settings.value)
-        assertEquals(AppSettings(shutterSound = false, grid = true), AppSettingsStore(memory).settings.value)
+        assertEquals(changed, store.settings.value)
+        assertEquals(changed, AppSettingsStore(memory).settings.value)
     }
 }

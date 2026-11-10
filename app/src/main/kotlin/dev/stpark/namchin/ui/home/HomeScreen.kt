@@ -15,7 +15,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
@@ -52,11 +56,19 @@ fun HomeScreen(
                         modifier = Modifier.height(32.dp),
                     )
                 },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.library_to_camera)) } },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.cd_back))
+                    }
+                },
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onAddClick) { Text(stringResource(R.string.home_add_reference)) }
+            ExtendedFloatingActionButton(
+                onClick = onAddClick,
+                icon = { Icon(Icons.Rounded.Add, null) },
+                text = { Text(stringResource(R.string.home_add_reference)) },
+            )
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {

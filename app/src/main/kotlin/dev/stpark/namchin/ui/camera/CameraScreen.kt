@@ -1,5 +1,7 @@
 package dev.stpark.namchin.ui.camera
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -15,49 +17,41 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.stpark.namchin.R
-import dev.stpark.namchin.camera.CameraUiState
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.GuidanceText
 import dev.stpark.namchin.camera.ShutterGate
 import dev.stpark.namchin.camera.Feedback
-import dev.stpark.namchin.camera.FeedbackSettings
 import dev.stpark.namchin.camera.GuideVoice
 import dev.stpark.namchin.camera.Haptics
 import dev.stpark.namchin.settings.AppSettingsStore
 import dev.stpark.namchin.ui.theme.Brand
 import dev.stpark.namchin.ui.theme.Jua
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.LifecycleEventObserver
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.compose.runtime.DisposableEffect
@@ -67,8 +61,6 @@ import androidx.compose.foundation.layout.width
 import dev.stpark.namchin.camera.ZoomLogic
 import androidx.camera.core.Camera
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.pointer.pointerInput
 import dev.stpark.namchin.camera.tiltDegrees
 import dev.stpark.namchin.core.framing.FramingAnalyzer
@@ -232,15 +224,19 @@ private fun CameraContent(
         }
     }
 
+    val settingsStore = remember { AppSettingsStore.get(context) }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
+            // 상단: 적용 중 레퍼런스(왼쪽), 설정(오른쪽). 안내 문구는 미리보기 위 캡슐로
             Row(
-                Modifier.fillMaxWidth().padding(8.dp).heightIn(min = 72.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 64.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (reference != null) AppliedReferenceChip(reference, onClear = { onSelectReference(null) })
-                GuidanceBanner(state, Modifier.weight(1f))
-                BrandChip(stringResource(R.string.settings_title), selected = false, onClick = onOpenSettings)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Rounded.Settings, stringResource(R.string.cd_settings), tint = Color.White)
+                }
             }
             Box(
                 Modifier
@@ -273,48 +269,36 @@ private fun CameraContent(
                 val level = state.output?.let { out -> out.cues.none { it is Guidance.Level } }
                     ?: (roll == null || abs(roll) <= FramingAnalyzer.LEVEL_TOLERANCE_DEG)
                 LevelIndicator(roll, level, Modifier.fillMaxSize())
+                GuidanceCapsule(
+                    state,
+                    // 위쪽 꺾쇠 사이 가운데 (꺾쇠·오른쪽 아이콘 줄과 겹치지 않게 양쪽 여백 동일)
+                    Modifier.align(Alignment.TopCenter).padding(top = 16.dp, start = 64.dp, end = 64.dp),
+                )
+                ControlRail(
+                    settings = state.settings,
+                    grid = appSettings.grid,
+                    showAutoShutter = reference?.pose != null,
+                    onChange = vm::updateSettings,
+                    onGrid = { settingsStore.update(appSettings.copy(grid = it)) },
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 10.dp),
+                )
                 zoomRange?.let { range ->
-                    ZoomButtons(
+                    ZoomCapsule(
                         presets = ZoomLogic.presets(range.start, range.endInclusive),
                         current = zoomRatio,
                         onSelect = ::setZoom,
-                        modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
                     )
                 }
-                FeedbackToggles(
-                    settings = state.settings,
-                    showAutoShutter = reference?.pose != null,
-                    onChange = vm::updateSettings,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                )
                 if (flash) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.7f)))
-                message?.let {
-                    Text(
-                        stringResource(it),
-                        color = Brand.Yellow,
-                        fontFamily = Jua,
-                        fontSize = 18.sp,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .background(Brand.Ink.copy(alpha = 0.9f), RoundedCornerShape(50))
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
-                    )
-                }
+                message?.let { Toast(stringResource(it), Modifier.align(Alignment.Center)) }
             }
             if (reference != null) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.camera_ghost), color = Brand.Paper, fontSize = 14.sp, fontFamily = Jua)
-                    Slider(
-                        value = ghostAlpha,
-                        onValueChange = { ghostAlpha = it },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Brand.Yellow,
-                            activeTrackColor = Brand.Yellow,
-                            inactiveTrackColor = Brand.InkSoft,
-                        ),
-                        modifier = Modifier.padding(start = 12.dp).weight(1f),
-                    )
-                }
+                GhostSlider(
+                    alpha = ghostAlpha,
+                    onChange = { ghostAlpha = it },
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
+                )
             }
             // 셔터 줄: 카드 손패는 이 칸 안의 오른쪽에만 둬서 다른 버튼 터치를 가로채지 않는다
             Box(Modifier.fillMaxWidth().weight(1f)) {
@@ -325,17 +309,19 @@ private fun CameraContent(
                     onOpenLibrary = onOpenLibrary,
                     modifier = Modifier.fillMaxSize(),
                 )
-                Text(
-                    stringResource(
-                        R.string.camera_stats,
-                        state.analysisMs.toInt(),
-                        state.fps,
-                        state.output?.match?.let { "%.2f".format(it.score) } ?: "-",
-                    ),
-                    color = Color.Gray,
-                    fontSize = 10.sp,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 4.dp),
-                )
+                if (appSettings.debugInfo) {
+                    Text(
+                        stringResource(
+                            R.string.camera_stats,
+                            state.analysisMs.toInt(),
+                            state.fps,
+                            state.output?.match?.let { "%.2f".format(it.score) } ?: "-",
+                        ),
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 10.sp,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 4.dp),
+                    )
+                }
                 CardHand(
                     references = all.filter { it.id != referenceId },
                     onSelect = { onSelectReference(it.id) },
@@ -364,86 +350,3 @@ private fun CameraContent(
 private const val FLASH_MS = 80L
 private const val BURST_COUNT = 3
 private const val MESSAGE_MS = 1_500L
-
-@Composable
-private fun FeedbackToggles(
-    settings: FeedbackSettings,
-    showAutoShutter: Boolean,
-    onChange: (FeedbackSettings) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.End) {
-        Toggle(stringResource(R.string.toggle_voice), settings.voice) { onChange(settings.copy(voice = it)) }
-        Toggle(stringResource(R.string.toggle_vibrate), settings.vibrate) { onChange(settings.copy(vibrate = it)) }
-        if (showAutoShutter) {
-            Toggle(stringResource(R.string.toggle_auto), settings.autoShutter) { onChange(settings.copy(autoShutter = it)) }
-        }
-    }
-}
-
-@Composable
-private fun Toggle(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
-    // 화면 읽기(TalkBack)가 스위치와 켜짐/꺼짐 상태를 읽도록
-    BrandChip(label, selected = on, modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = onToggle))
-}
-
-/** 노랑(선택) / 반투명 남색(기본) 둥근 칩. 카메라 화면 버튼 공통 모양. */
-@Composable
-private fun BrandChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    Text(
-        label,
-        color = if (selected) Brand.Ink else Brand.Paper,
-        fontSize = 14.sp,
-        fontFamily = Jua,
-        modifier = modifier
-            .background(if (selected) Brand.Yellow else Brand.Ink.copy(alpha = 0.6f), RoundedCornerShape(50))
-            .border(1.dp, if (selected) Brand.Yellow else Brand.Paper.copy(alpha = 0.35f), RoundedCornerShape(50))
-            .let { m -> if (onClick != null) m.clickable(onClick = onClick) else m }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    )
-}
-
-@Composable
-private fun ZoomButtons(presets: List<Float>, current: Float, onSelect: (Float) -> Unit, modifier: Modifier = Modifier) {
-    val selected = ZoomLogic.selected(current, presets)
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
-        presets.forEach { preset ->
-            val isSelected = preset == selected
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(if (isSelected) Brand.Yellow else Brand.Ink.copy(alpha = 0.55f))
-                    .clickable { onSelect(preset) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    if (isSelected) ZoomLogic.label(current) else ZoomLogic.label(preset),
-                    color = if (isSelected) Brand.Ink else Brand.Paper,
-                    fontFamily = Jua,
-                    fontSize = 14.sp,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun GuidanceBanner(state: CameraUiState, modifier: Modifier = Modifier) {
-    val output = state.output
-    val display = output?.display
-    val text = when {
-        state.reference != null && state.reference.pose == null -> stringResource(R.string.camera_no_reference_pose)
-        output == null -> ""
-        display != null -> stringResource(GuidanceText.of(display))
-        output.aligned -> stringResource(R.string.camera_aligned)
-        else -> ""
-    }
-    Text(
-        text,
-        modifier = modifier.padding(horizontal = 8.dp),
-        color = if (output?.aligned == true) Brand.Yellow else Brand.Paper,
-        fontSize = 20.sp,
-        fontFamily = Jua,
-    )
-}

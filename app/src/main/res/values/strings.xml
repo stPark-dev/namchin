@@ -84,4 +84,17 @@
     <string name="settings_shutter_sound_desc">촬영할 때 찰칵 소리를 냅니다</string>
     <string name="settings_grid">격자</string>
     <string name="settings_grid_desc">찍힐 영역에 삼분할 선을 표시합니다</string>
+
+    <string name="settings_debug_info">분석 정보 표시</string>
+    <string name="settings_debug_info_desc">개발용: 분석 속도와 포즈 일치도를 화면 아래에 표시합니다</string>
+    <string name="cd_settings">설정</string>
+    <string name="cd_back">뒤로</string>
+    <string name="cd_voice">음성 안내</string>
+    <string name="cd_vibrate">진동</string>
+    <string name="cd_auto_shutter">자동 셔터</string>
+    <string name="cd_grid">격자</string>
+    <string name="cd_ghost">레퍼런스 겹쳐 보기 투명도</string>
+    <string name="cd_clear_reference">레퍼런스 해제</string>
+    <string name="cd_close">닫기</string>
+    <string name="cd_delete">삭제</string>
 </resources>

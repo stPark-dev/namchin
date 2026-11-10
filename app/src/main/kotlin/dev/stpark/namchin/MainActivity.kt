@@ -1,5 +1,7 @@
 package dev.stpark.namchin
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
@@ -7,9 +9,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import dev.stpark.namchin.ui.NamchinApp
 import dev.stpark.namchin.ui.theme.NamchinTheme
 

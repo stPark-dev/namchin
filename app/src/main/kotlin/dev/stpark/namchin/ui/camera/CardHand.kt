@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +40,11 @@ import dev.stpark.namchin.R
 import dev.stpark.namchin.data.Reference
 import dev.stpark.namchin.ui.theme.Brand
 import dev.stpark.namchin.ui.theme.Jua
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
@@ -58,7 +62,7 @@ fun ReferenceCard(reference: Reference, modifier: Modifier = Modifier) {
         modifier = modifier
             .shadow(6.dp, CARD_SHAPE)
             .clip(CARD_SHAPE)
-            .border(BorderStroke(2.dp, Brand.Paper), CARD_SHAPE)
+            .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.9f)), CARD_SHAPE)
             .background(Color.DarkGray),
     )
 }
@@ -131,13 +135,13 @@ fun CardDeck(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.deck_title),
-                    color = Brand.Paper,
-                    fontFamily = Jua,
-                    fontSize = 22.sp,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onClose) {
-                    Text(stringResource(R.string.deck_close), color = Brand.Yellow, fontFamily = Jua, fontSize = 16.sp)
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Rounded.Close, stringResource(R.string.cd_close), tint = Color.White)
                 }
             }
             if (references.isEmpty()) {
@@ -175,16 +179,17 @@ fun CardDeck(
 fun AppliedReferenceChip(reference: Reference, onClear: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier.size(64.dp, 80.dp)) {
         ReferenceCard(reference, Modifier.fillMaxSize().padding(top = 8.dp, end = 8.dp))
-        Text(
-            "✕",
-            color = Brand.Ink,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
+        Box(
+            Modifier
                 .align(Alignment.TopEnd)
-                .clip(RoundedCornerShape(50))
-                .background(Brand.Yellow)
-                .clickable(onClick = onClear)
-                .padding(horizontal = 7.dp, vertical = 1.dp),
-        )
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(Brand.Ink)
+                .border(1.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                .clickable(onClick = onClear),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.Close, stringResource(R.string.cd_clear_reference), tint = Color.White, modifier = Modifier.size(14.dp))
+        }
     }
 }

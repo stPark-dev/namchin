@@ -12,7 +12,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,7 +33,11 @@ fun SettingsScreen(settings: AppSettings, onChange: (AppSettings) -> Unit, onBac
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.library_to_camera)) } },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.cd_back))
+                    }
+                },
             )
         },
     ) { padding ->
@@ -47,6 +54,13 @@ fun SettingsScreen(settings: AppSettings, onChange: (AppSettings) -> Unit, onBac
                 description = stringResource(R.string.settings_grid_desc),
                 checked = settings.grid,
                 onChange = { onChange(settings.copy(grid = it)) },
+            )
+            HorizontalDivider()
+            SettingRow(
+                title = stringResource(R.string.settings_debug_info),
+                description = stringResource(R.string.settings_debug_info_desc),
+                checked = settings.debugInfo,
+                onChange = { onChange(settings.copy(debugInfo = it)) },
             )
         }
     }
