@@ -33,11 +33,19 @@ import androidx.compose.ui.unit.dp
 import dev.stpark.namchin.R
 import dev.stpark.namchin.core.reference.SizeBasis
 import dev.stpark.namchin.data.Reference
+import dev.stpark.namchin.core.tagging.Tag
 import dev.stpark.namchin.ui.common.ReferenceImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReferenceDetailScreen(reference: Reference, onShoot: () -> Unit, onDelete: () -> Unit, onBack: () -> Unit) {
+fun ReferenceDetailScreen(
+    reference: Reference,
+    allReferences: List<Reference>,
+    onConfirmTags: (Set<Tag>) -> Unit,
+    onShoot: () -> Unit,
+    onDelete: () -> Unit,
+    onBack: () -> Unit,
+) {
     var confirmDelete by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -61,6 +69,11 @@ fun ReferenceDetailScreen(reference: Reference, onShoot: () -> Unit, onDelete: (
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ReferenceImage(reference, Modifier.fillMaxWidth())
+            TagEditor(
+                tags = reference.displayTags(allReferences),
+                confirmed = reference.tagsConfirmed,
+                onConfirm = onConfirmTags,
+            )
             ProfileCard(reference)
             Button(onClick = onShoot, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                 Icon(Icons.Rounded.PhotoCamera, null)

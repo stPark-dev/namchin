@@ -7,6 +7,8 @@ import dev.stpark.namchin.core.tagging.Embedding
 import dev.stpark.namchin.core.tagging.EmbeddingCodec
 import dev.stpark.namchin.core.tagging.Tag
 import dev.stpark.namchin.core.tagging.TagCodec
+import dev.stpark.namchin.core.tagging.TagSuggestion
+import dev.stpark.namchin.core.tagging.TaggedExample
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.model.PoseCodec
 import dev.stpark.namchin.core.reference.ReferenceProfile
@@ -32,6 +34,17 @@ data class Reference(
 ) {
     val aspectRatio: Float get() = width.toFloat() / height
     val profile: ReferenceProfile by lazy { ReferenceProfile.of(pose) }
+
+    /**
+     * 화면에 보여줄 태그: 확정했으면 그대로, 아니면 자동 태그 + 확정된 비슷한 레퍼런스에게서 배운 장소·계절.
+     */
+    fun displayTags(all: List<Reference>): Set<Tag> = if (tagsConfirmed) {
+        tags
+    } else {
+        val examples = all.filter { it.tagsConfirmed && it.id != id && it.embedding != null }
+            .map { TaggedExample(it.embedding!!, it.tags) }
+        TagSuggestion.suggest(tags, embedding, examples)
+    }
 }
 
 class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: File) {
@@ -43,7 +56,7 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
      * 크롭된 이미지를 앱 저장소에 JPEG로 쓰고 DB에 등록한다.
      * 호출한 화면이 사라져도 파일·DB가 어긋나지 않게 취소 불가로 끝까지 수행한다.
      */
-    suspend fun save(bitmap: Bitmap, pose: PersonPose?, embedding: Embedding?): Long =
+    suspend fun save(bitmap: Bitmap, pose: PersonPose?, embedding: Embedding?, tags: Set<Tag>?): Long =
         withContext(Dispatchers.IO + NonCancellable) {
         imageDir.mkdirs()
         val file = File(imageDir, "${UUID.randomUUID()}.jpg")
@@ -58,6 +71,7 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
                     pose = pose?.let(PoseCodec::encode),
                     createdAt = System.currentTimeMillis(),
                     embedding = embedding?.let(EmbeddingCodec::encode),
+                    tags = tags?.let(TagCodec::encode),
                 ),
             )
         } catch (e: Exception) {
@@ -80,6 +94,19 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
                 ?: return@count false
             val embedding = embed(bitmap) ?: return@count false
             dao.updateEmbedding(entity.id, EmbeddingCodec.encode(embedding))
+            true
+        }
+    }
+
+    /** 자동 태그가 없는 레퍼런스(이전 버전에서 저장한 것)를 채운다. 채운 개수를 돌려준다. */
+    suspend fun backfillTags(autoTag: suspend (Bitmap, PersonPose?) -> Set<Tag>): Int {
+        val missing = withContext(Dispatchers.IO) { dao.withoutTags() }
+        return missing.count { entity ->
+            val bitmap = withContext(Dispatchers.IO) {
+                BitmapFactory.decodeFile(entity.imagePath, BitmapFactory.Options().apply { inSampleSize = 2 })
+            } ?: return@count false
+            val tags = autoTag(bitmap, entity.pose?.let(PoseCodec::decode))
+            withContext(Dispatchers.IO) { dao.updateTags(entity.id, TagCodec.encode(tags), false) }
             true
         }
     }

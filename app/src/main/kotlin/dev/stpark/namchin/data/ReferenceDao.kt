@@ -19,6 +19,9 @@ interface ReferenceDao {
     @Query("DELETE FROM reference WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("SELECT * FROM reference WHERE tags IS NULL")
+    suspend fun withoutTags(): List<ReferenceEntity>
+
     @Query("SELECT * FROM reference WHERE embedding IS NULL")
     suspend fun withoutEmbedding(): List<ReferenceEntity>
 

@@ -105,6 +105,8 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
                 if (reference != null) {
                     ReferenceDetailScreen(
                         reference = reference,
+                        allReferences = loaded,
+                        onConfirmTags = { referencesVm.confirmTags(s.id, it) },
                         onShoot = { toCamera(s.id) },
                         onDelete = {
                             if (s.id == cameraReferenceId) cameraReferenceId = null

@@ -13,6 +13,7 @@ import dev.stpark.namchin.data.ReferenceRepository
 import dev.stpark.namchin.image.BitmapLoader
 import dev.stpark.namchin.ml.ReferencePoseAnalyzer
 import dev.stpark.namchin.ml.SceneEmbedder
+import dev.stpark.namchin.ml.AutoTagger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -84,7 +85,10 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                         .onFailure { Log.w(TAG, "임베딩 실패", it) }
                         .getOrNull()
                 }
-                ImportUiState.Saved(repository.save(cropped, pose, embedding))
+                val tags = runCatching { AutoTagger.tags(cropped, pose) }
+                    .onFailure { Log.w(TAG, "자동 태그 실패", it) }
+                    .getOrNull()
+                ImportUiState.Saved(repository.save(cropped, pose, embedding, tags))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

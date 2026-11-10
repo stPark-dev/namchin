@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import android.util.Log
 import dev.stpark.namchin.ml.SceneEmbedder
+import dev.stpark.namchin.ml.AutoTagger
+import dev.stpark.namchin.core.tagging.Tag
 import kotlinx.coroutines.Dispatchers
 
 class ReferencesViewModel(app: Application) : AndroidViewModel(app) {
@@ -26,7 +28,15 @@ class ReferencesViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { repository.backfillEmbeddings { SceneEmbedder.get(app).embed(it) } }
                 .onSuccess { if (it > 0) Log.i(TAG, "임베딩 채움: ${it}장") }
                 .onFailure { Log.w(TAG, "임베딩 채우기 실패", it) }
+            runCatching { repository.backfillTags(AutoTagger::tags) }
+                .onSuccess { if (it > 0) Log.i(TAG, "자동 태그 채움: ${it}장") }
+                .onFailure { Log.w(TAG, "자동 태그 채우기 실패", it) }
         }
+    }
+
+    /** 사용자가 고른 태그로 확정한다. 이후 비슷한 사진의 태그 제안에 쓰인다. */
+    fun confirmTags(id: Long, tags: Set<Tag>) {
+        viewModelScope.launch { repository.updateTags(id, tags, confirmed = true) }
     }
 
     fun delete(id: Long) {

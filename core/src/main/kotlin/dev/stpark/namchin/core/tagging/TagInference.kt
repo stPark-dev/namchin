@@ -31,7 +31,8 @@ class TaggedExample(val embedding: Embedding, val tags: Set<Tag>)
  */
 object TagInference {
     const val K = 5
-    const val MIN_SIMILARITY = 0.6f
+    /** 기기 실측(MobileNet V3 Small): 비슷한 장면 0.40~0.66, 무관한 장면 약 0.2 → 0.35 */
+    const val MIN_SIMILARITY = 0.35f
     const val VOTE_THRESHOLD = 0.5f
 
     fun suggest(

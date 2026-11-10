@@ -109,4 +109,10 @@
     <string name="review_kept">고른 사진만 남겼어요</string>
     <string name="review_keep_failed">일부 사진은 지우지 못했어요</string>
     <string name="review_reference">레퍼런스</string>
+
+    <string name="tags_title">태그</string>
+    <string name="tags_suggested">자동 제안 · 눌러서 고치면 비슷한 사진에도 반영돼요</string>
+    <string name="tags_confirmed">확정됨</string>
+    <string name="tags_confirm">이대로 확정</string>
+    <string name="deck_filter_all">전체</string>
 </resources>

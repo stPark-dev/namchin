@@ -54,6 +54,7 @@ dependencies {
     ksp(libs.room.compiler)
     implementation(libs.mlkit.pose.accurate)
     implementation(libs.mlkit.face)
+    implementation(libs.mlkit.labeling)
     implementation(libs.mediapipe.vision)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)

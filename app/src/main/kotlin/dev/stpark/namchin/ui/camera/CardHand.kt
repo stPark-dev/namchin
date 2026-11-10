@@ -38,6 +38,14 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.stpark.namchin.R
 import dev.stpark.namchin.data.Reference
+import dev.stpark.namchin.core.tagging.Tag
+import dev.stpark.namchin.core.tagging.TagVocabulary
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as rowItems
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.stpark.namchin.ui.theme.Brand
 import dev.stpark.namchin.ui.theme.Jua
 import androidx.compose.foundation.shape.CircleShape
@@ -153,13 +161,29 @@ fun CardDeck(
                     }
                 }
             } else {
+                // 태그 필터: 레퍼런스들에 실제로 있는 태그만
+                val available = remember(references) {
+                    val present = references.flatMap { it.displayTags(references) }.toSet()
+                    TagVocabulary.CATEGORIES.flatMap { it.tags }.filter { it in present }
+                }
+                var filter by remember { mutableStateOf<Tag?>(null) }
+                val shown = filter?.let { f -> references.filter { f in it.displayTags(references) } } ?: references
+                LazyRow(
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    item { DeckFilterChip(stringResource(R.string.deck_filter_all), filter == null) { filter = null } }
+                    rowItems(available, key = { it.name }) { tag ->
+                        DeckFilterChip(tag.name, filter == tag) { filter = if (filter == tag) null else tag }
+                    }
+                }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     contentPadding = PaddingValues(vertical = 16.dp),
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
                 ) {
-                    items(references, key = { it.id }) { reference ->
+                    items(shown, key = { it.id }) { reference ->
                         ReferenceCard(
                             reference,
                             Modifier
@@ -172,6 +196,20 @@ fun CardDeck(
             }
         }
     }
+}
+
+@Composable
+private fun DeckFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        color = if (selected) Brand.Ink else Color.White,
+        fontSize = 14.sp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) Brand.Yellow else Color.White.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    )
 }
 
 /** 적용 중인 레퍼런스. ✕로 기본 모드로 돌아간다. */

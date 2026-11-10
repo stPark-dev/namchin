@@ -77,4 +77,13 @@ class TagInferenceTest {
 
         assertEquals(setOf(autumn), tags)
     }
+
+    @Test
+    fun `moderately similar scenes count as neighbours`() {
+        // 실제 기기 임베딩(MobileNet V3 Small)에서 비슷한 장면끼리 유사도 0.40~0.66, 무관한 장면 약 0.2
+        val moderate = Embedding(floatArrayOf(0.4f, 0.9165f)) // (1,0)과 유사도 0.4
+        val examples = listOf(TaggedExample(moderate, setOf(autumn)))
+
+        assertEquals(setOf(autumn), TagInference.suggest(emb(1f, 0f), examples, emptySet(), mapping))
+    }
 }

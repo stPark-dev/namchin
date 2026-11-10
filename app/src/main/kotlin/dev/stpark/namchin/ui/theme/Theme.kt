@@ -14,6 +14,9 @@ private val Light = lightColorScheme(
     onPrimaryContainer = Brand.Ink,
     secondary = Brand.Yellow,
     onSecondary = Brand.Ink,
+    // 선택된 칩(태그) 바탕
+    secondaryContainer = Brand.Yellow,
+    onSecondaryContainer = Brand.Ink,
     tertiary = Brand.YellowDeep,
     background = Brand.Paper,
     onBackground = Brand.Ink,
