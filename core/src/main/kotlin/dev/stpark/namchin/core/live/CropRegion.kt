@@ -22,10 +22,12 @@ object CropRegion {
             Region((1 - w) / 2, 0f, (1 + w) / 2, 1f)
         }
 
-    /** 영역 밖 관절은 0..1 범위를 벗어난 좌표로 남는다. */
+    /** 영역 밖 관절은 최종 사진에서 잘리므로 신뢰도 0 (안 보이는 것으로) 처리한다. */
     fun remap(pose: PersonPose, region: Region): PersonPose = PersonPose(
         keypoints = pose.keypoints.mapValues { (_, k) ->
-            k.copy(position = Point((k.position.x - region.left) / region.width, (k.position.y - region.top) / region.height))
+            val p = Point((k.position.x - region.left) / region.width, (k.position.y - region.top) / region.height)
+            val inside = p.x in 0f..1f && p.y in 0f..1f
+            k.copy(position = p, confidence = if (inside) k.confidence else 0f)
         },
         aspectRatio = pose.aspectRatio * region.width / region.height,
     )

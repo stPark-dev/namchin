@@ -28,19 +28,25 @@ private val TARGET = Color(0xCCFFFFFF)
 private val CURRENT = Color(0xFFFFD600)
 private val ALIGNED = Color(0xFF00E676)
 
+/** region 위치에 내용을 배치한다 (4:3 프리뷰 박스 기준). */
+@Composable
+private fun InRegion(region: Region, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    BoxWithConstraints(modifier) {
+        Box(
+            Modifier
+                .offset(maxWidth * region.left, maxHeight * region.top)
+                .size(maxWidth * region.width, maxHeight * region.height),
+        ) { content() }
+    }
+}
+
 /**
- * 4:3 프리뷰 위에 그린다: 찍히지 않는 영역 어둡게, 반투명 레퍼런스, 목표 골격(흰색), 현재 골격.
+ * 프레임마다 바뀌지 않는 부분: 찍히지 않는 영역 어둡게, 반투명 레퍼런스, 목표 골격(흰색).
+ * 인자가 그대로면 재구성을 건너뛴다.
  */
 @Composable
-fun GuideOverlay(
-    reference: Reference,
-    region: Region,
-    current: PersonPose?,
-    aligned: Boolean,
-    ghostAlpha: Float,
-    modifier: Modifier = Modifier,
-) {
-    BoxWithConstraints(modifier) {
+fun StaticGuide(reference: Reference, region: Region, ghostAlpha: Float, modifier: Modifier = Modifier) {
+    Box(modifier) {
         Canvas(Modifier.fillMaxSize()) {
             val l = region.left * size.width
             val t = region.top * size.height
@@ -51,11 +57,7 @@ fun GuideOverlay(
             drawRect(DIM, Offset(0f, t), Size(l, b - t))
             drawRect(DIM, Offset(r, t), Size(size.width - r, b - t))
         }
-        Box(
-            Modifier
-                .offset(maxWidth * region.left, maxHeight * region.top)
-                .size(maxWidth * region.width, maxHeight * region.height),
-        ) {
+        InRegion(region, Modifier.fillMaxSize()) {
             AsyncImage(
                 model = File(reference.imagePath),
                 contentDescription = null,
@@ -63,14 +65,22 @@ fun GuideOverlay(
                 modifier = Modifier.fillMaxSize().alpha(ghostAlpha),
             )
             SkeletonOverlay(reference.pose, Modifier.fillMaxSize(), stroke = 3.dp, color = TARGET)
-            SkeletonOverlay(current, Modifier.fillMaxSize(), stroke = 3.dp, color = if (aligned) ALIGNED else CURRENT)
         }
     }
 }
 
-/** 화면 중앙 수평선. 폰이 기운 만큼 반대로 돌려 실제 수평을 보여준다. */
+/** 프레임마다 바뀌는 현재 골격. 맞으면 초록, 아니면 노랑. */
 @Composable
-fun LevelIndicator(rollDegrees: Float, level: Boolean, modifier: Modifier = Modifier) {
+fun LiveSkeleton(current: PersonPose?, region: Region, aligned: Boolean, modifier: Modifier = Modifier) {
+    InRegion(region, modifier) {
+        SkeletonOverlay(current, Modifier.fillMaxSize(), stroke = 3.dp, color = if (aligned) ALIGNED else CURRENT)
+    }
+}
+
+/** 화면 중앙 수평선. 폰이 기운 만큼 반대로 돌려 실제 수평을 보여준다. 기울기를 모르면 숨긴다. */
+@Composable
+fun LevelIndicator(rollDegrees: Float?, level: Boolean, modifier: Modifier = Modifier) {
+    if (rollDegrees == null) return
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(160.dp, 4.dp).rotate(-rollDegrees)) {
             drawRect(if (level) ALIGNED else CURRENT)

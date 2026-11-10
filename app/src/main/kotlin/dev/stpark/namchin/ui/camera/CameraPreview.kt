@@ -9,7 +9,17 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import android.util.Log
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import dev.stpark.namchin.R
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -38,39 +48,57 @@ fun CameraPreview(onFrame: (PoseFrame) -> Unit, modifier: Modifier = Modifier) {
         PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
     }
     val currentOnFrame by rememberUpdatedState(onFrame)
+    var failed by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val executor = Executors.newSingleThreadExecutor()
-        val analyzer = LivePoseAnalyzer { currentOnFrame(it) }
+        val analyzer = LivePoseAnalyzer(executor) { currentOnFrame(it) }
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
+        var analysisUseCase: ImageAnalysis? = null
         var disposed = false
         future.addListener({
             if (disposed) return@addListener
-            val p = future.get().also { provider = it }
-            val ratio = ResolutionSelector.Builder()
-                .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
-            val preview = Preview.Builder().setResolutionSelector(ratio.build()).build()
-                .also { it.surfaceProvider = previewView.surfaceProvider }
-            val analysis = ImageAnalysis.Builder()
-                .setResolutionSelector(
-                    ratio.setResolutionStrategy(
-                        ResolutionStrategy(ANALYSIS_SIZE, ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER),
-                    ).build(),
-                )
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { it.setAnalyzer(executor, analyzer) }
-            p.unbindAll()
-            p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+            try {
+                val p = future.get().also { provider = it }
+                val ratio = ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                val preview = Preview.Builder().setResolutionSelector(ratio.build()).build()
+                    .also { it.surfaceProvider = previewView.surfaceProvider }
+                val analysis = ImageAnalysis.Builder()
+                    .setResolutionSelector(
+                        ratio.setResolutionStrategy(
+                            ResolutionStrategy(ANALYSIS_SIZE, ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER),
+                        ).build(),
+                    )
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also { it.setAnalyzer(executor, analyzer) }
+                analysisUseCase = analysis
+                p.unbindAll()
+                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                // 오버레이는 프리뷰와 분석이 같은 4:3 화각이라고 가정한다
+                Log.i(TAG, "preview=${preview.resolutionInfo?.resolution} analysis=${analysis.resolutionInfo?.resolution}")
+            } catch (e: Exception) {
+                Log.e(TAG, "카메라 연결 실패", e)
+                failed = true
+            }
         }, ContextCompat.getMainExecutor(context))
 
         onDispose {
             disposed = true
+            analysisUseCase?.clearAnalyzer()
             provider?.unbindAll()
             executor.shutdown()
             analyzer.close()
         }
     }
-    AndroidView(factory = { previewView }, modifier = modifier)
+    Box(modifier) {
+        AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+        if (failed) {
+            Text(stringResource(R.string.camera_error), color = Color.White, modifier = Modifier.align(Alignment.Center))
+        }
+    }
 }
+
+private const val TAG = "CameraPreview"

@@ -14,31 +14,44 @@ object FramingAnalyzer {
     const val EXIT_FACTOR = 0.6f
 
     /**
-     * @param rollDegrees 폰이 시계 방향으로 기울어진 각도 (양수 = 시계 방향)
+     * @param rollDegrees 폰이 시계 방향으로 기울어진 각도 (양수 = 시계 방향). null이면 수평은 안 본다
      * @param previous 직전 프레임의 안내
      */
     fun analyze(
         reference: PersonFrame,
         current: PersonFrame,
-        rollDegrees: Float,
+        rollDegrees: Float?,
         previous: Collection<Guidance> = emptyList(),
     ): List<Guidance> {
-        fun pick(value: Float, tolerance: Float, ifPositive: Guidance, ifNegative: Guidance): Guidance? {
-            val candidate = if (value > 0) ifPositive else ifNegative
-            val limit = if (candidate in previous) tolerance * EXIT_FACTOR else tolerance
-            return candidate.takeIf { kotlin.math.abs(value) > limit }
-        }
+        fun pick(value: Float, tolerance: Float, ifPositive: Guidance, ifNegative: Guidance) =
+            pick(value, tolerance, ifPositive, ifNegative, previous)
         return listOfNotNull(
-            pick(
-                rollDegrees, LEVEL_TOLERANCE_DEG,
-                Guidance.Level(Rotation.COUNTERCLOCKWISE), Guidance.Level(Rotation.CLOCKWISE),
-            ),
+            rollDegrees?.let { levelCue(it, previous) },
             sizeRatio(reference, current)?.let { pick(it - 1, SIZE_TOLERANCE, Guidance.MoveBack, Guidance.MoveCloser) },
             // 인물이 화면 위쪽(음수)에 있으면 폰을 위로 기울여야 인물이 내려온다.
             pick(current.anchorY - reference.anchorY, POSITION_TOLERANCE, Guidance.TiltDown, Guidance.TiltUp),
             // 인물이 화면 왼쪽(음수)에 있으면 폰을 왼쪽으로 돌려야 인물이 오른쪽으로 온다.
             pick(current.anchorX - reference.anchorX, POSITION_TOLERANCE, Guidance.PanRight, Guidance.PanLeft),
         )
+    }
+
+    /** 인물과 무관한 수평 안내. */
+    fun levelCue(rollDegrees: Float, previous: Collection<Guidance> = emptyList()): Guidance? = pick(
+        rollDegrees, LEVEL_TOLERANCE_DEG,
+        Guidance.Level(Rotation.COUNTERCLOCKWISE), Guidance.Level(Rotation.CLOCKWISE),
+        previous,
+    )
+
+    private fun pick(
+        value: Float,
+        tolerance: Float,
+        ifPositive: Guidance,
+        ifNegative: Guidance,
+        previous: Collection<Guidance>,
+    ): Guidance? {
+        val candidate = if (value > 0) ifPositive else ifNegative
+        val limit = if (candidate in previous) tolerance * EXIT_FACTOR else tolerance
+        return candidate.takeIf { kotlin.math.abs(value) > limit }
     }
 
     /** 몸통 길이가 양쪽에 다 있으면 몸통, 아니면 목 길이로 비교. 공통 기준이 없으면 null. */

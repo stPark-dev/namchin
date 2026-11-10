@@ -9,9 +9,17 @@ import dev.stpark.namchin.core.live.DeviceTilt
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.abs
 
-/** 중력 센서 → 폰 좌우 기울기(도). 센서가 없으면 아무것도 내보내지 않는다. */
-fun tiltDegrees(context: Context): Flow<Float> = callbackFlow {
+/** 이보다 작은 변화는 무시해 화면 갱신을 줄인다. */
+private const val MIN_CHANGE_DEG = 0.5f
+
+/**
+ * 중력 센서 → 폰 좌우 기울기(도). 폰이 거의 누워 있으면 null.
+ * 센서가 없으면 아무것도 내보내지 않는다.
+ */
+fun tiltDegrees(context: Context): Flow<Float?> = callbackFlow {
     val manager = context.getSystemService(SensorManager::class.java)
     val sensor = manager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
     if (manager == null || sensor == null) {
@@ -27,4 +35,6 @@ fun tiltDegrees(context: Context): Flow<Float> = callbackFlow {
     }
     manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
     awaitClose { manager.unregisterListener(listener) }
+}.distinctUntilChanged { old, new ->
+    old == new || (old != null && new != null && abs(old - new) < MIN_CHANGE_DEG)
 }

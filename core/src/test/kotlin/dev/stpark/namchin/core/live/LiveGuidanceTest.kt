@@ -27,8 +27,9 @@ class LiveGuidanceTest {
 
     private fun step(
         current: PersonPose?,
+        reference: PersonPose = this.reference,
         state: LiveState = LiveState(),
-        roll: Float = 0f,
+        roll: Float? = 0f,
         now: Long = 0,
         poseEnabled: Boolean = true,
     ) = LiveGuidance.step(state, LiveInput(reference, current, roll, poseEnabled, now))
@@ -93,5 +94,39 @@ class LiveGuidanceTest {
 
         assertTrue(out.aligned)
         assertNull(out.match)
+    }
+
+    @Test
+    fun `level is checked even when no person is in frame`() {
+        val (_, out) = step(current = null, roll = 8f)
+
+        assertEquals(Guidance.NoPerson, out.display)
+        assertTrue(Guidance.Level(Rotation.COUNTERCLOCKWISE) in out.cues)
+    }
+
+    @Test
+    fun `unknown roll gives no level cue`() {
+        val (_, out) = step(pose(rightArmRaised), roll = null)
+
+        assertTrue(out.aligned)
+        assertTrue(out.cues.isEmpty())
+    }
+
+    @Test
+    fun `reference without frame still checks level`() {
+        val noFrameRef = pose(rightArmRaised.filterKeys { "SHOULDER" !in it.name && it != Joint.NOSE })
+
+        val (_, out) = step(pose(rightArmRaised), reference = noFrameRef, roll = 8f)
+
+        assertEquals(Guidance.Level(Rotation.COUNTERCLOCKWISE), out.display)
+    }
+
+    @Test
+    fun `reference with neither frame nor comparable pose is never aligned`() {
+        val legsOnlyRef = pose(rightArmRaised.filterKeys { "HIP" in it.name || "KNEE" in it.name })
+
+        val (_, out) = step(pose(rightArmRaised), reference = legsOnlyRef)
+
+        assertFalse(out.aligned)
     }
 }

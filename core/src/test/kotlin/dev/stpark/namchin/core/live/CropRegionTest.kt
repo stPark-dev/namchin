@@ -42,4 +42,14 @@ class CropRegionTest {
         assertEquals(1f, remapped.aspectRatio, 1e-5f)
         assertEquals(Point(0.5f, (0.25f - 0.125f) / 0.75f), remapped.keypoints.getValue(Joint.NOSE).position)
     }
+
+    @Test
+    fun `joints outside the region are treated as not visible`() {
+        val source = pose(mapOf(Joint.NOSE to Point(0.5f, 0.05f), Joint.LEFT_HIP to Point(0.5f, 0.5f)), aspectRatio = 0.75f)
+
+        val remapped = CropRegion.remap(source, Region(0f, 0.125f, 1f, 0.875f))
+
+        assertEquals(0f, remapped.keypoints.getValue(Joint.NOSE).confidence)
+        assertEquals(0.9f, remapped.keypoints.getValue(Joint.LEFT_HIP).confidence)
+    }
 }

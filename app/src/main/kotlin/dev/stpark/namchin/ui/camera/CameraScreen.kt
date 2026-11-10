@@ -42,7 +42,12 @@ import dev.stpark.namchin.camera.CameraUiState
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.GuidanceText
 import dev.stpark.namchin.camera.tiltDegrees
+import dev.stpark.namchin.core.framing.FramingAnalyzer
 import dev.stpark.namchin.core.guidance.Guidance
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlin.math.abs
 
 private const val ANALYSIS_ASPECT = 3f / 4f
 
@@ -80,8 +85,12 @@ private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
     val vm: CameraViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     var ghostAlpha by rememberSaveable { mutableFloatStateOf(0.35f) }
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(referenceId) { vm.start(referenceId) }
-    LaunchedEffect(Unit) { tiltDegrees(context).collect(vm::onTilt) }
+    // 화면이 보일 때만 센서 사용
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { tiltDegrees(context).collect(vm::onTilt) }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -93,17 +102,13 @@ private fun CameraContent(referenceId: Long, onBack: () -> Unit) {
             val reference = state.reference
             val region = state.region
             if (reference != null && region != null) {
-                GuideOverlay(
-                    reference = reference,
-                    region = region,
-                    current = state.current,
-                    aligned = state.output?.aligned == true,
-                    ghostAlpha = ghostAlpha,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
+                LiveSkeleton(state.current, region, state.output?.aligned == true, Modifier.fillMaxSize())
             }
-            val levelCue = state.output?.display is Guidance.Level
-            LevelIndicator(state.rollDegrees, level = !levelCue, modifier = Modifier.fillMaxSize())
+            val roll = state.rollDegrees
+            val level = state.output?.let { out -> out.cues.none { it is Guidance.Level } }
+                ?: (roll == null || abs(roll) <= FramingAnalyzer.LEVEL_TOLERANCE_DEG)
+            LevelIndicator(roll, level, Modifier.fillMaxSize())
         }
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.camera_ghost), color = Color.White)

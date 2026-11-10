@@ -29,7 +29,7 @@ data class CameraUiState(
     val region: Region? = null,
     val current: PersonPose? = null,
     val output: LiveOutput? = null,
-    val rollDegrees: Float = 0f,
+    val rollDegrees: Float? = null,
     val analysisMs: Long = 0,
     val fps: Float = 0f,
 )
@@ -39,28 +39,31 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(CameraUiState())
     val state: StateFlow<CameraUiState> = _state.asStateFlow()
     private var live = LiveState()
-    private var referenceId: Long? = null
     private var lastFrameAt = 0L
 
-    /** 레퍼런스가 바뀌면 상태를 새로 시작한다. */
+    /** 촬영 화면에 들어올 때마다 새로 시작한다 (같은 레퍼런스면 다시 불러오지 않음). */
     fun start(referenceId: Long) {
-        if (referenceId == this.referenceId) return
-        this.referenceId = referenceId
+        val cached = _state.value.reference?.takeIf { it.id == referenceId }
         live = LiveState()
-        _state.value = CameraUiState()
-        viewModelScope.launch {
-            val reference = repository.get(referenceId)
-            _state.update { it.copy(reference = reference) }
+        lastFrameAt = 0L
+        _state.value = CameraUiState(reference = cached)
+        if (cached == null) {
+            viewModelScope.launch {
+                val reference = repository.get(referenceId)
+                _state.update { it.copy(reference = reference) }
+            }
         }
     }
 
-    fun onTilt(degrees: Float) = _state.update { it.copy(rollDegrees = degrees) }
+    fun onTilt(degrees: Float?) = _state.update { it.copy(rollDegrees = degrees) }
 
     fun onFrame(frame: PoseFrame) {
         val snapshot = _state.value
         val reference = snapshot.reference ?: return
         val now = SystemClock.elapsedRealtime()
+        // 같은 값이면 같은 인스턴스를 유지해 오버레이 정적 부분의 재구성을 건너뛰게 한다
         val region = CropRegion.centerCrop(frame.width.toFloat() / frame.height, reference.aspectRatio)
+            .let { if (it == snapshot.region) snapshot.region else it }
         val current = MlKitPoseMapper.toPersonPose(frame.landmarks, frame.width, frame.height)
             ?.let { CropRegion.remap(it, region) }
         val output = reference.pose?.let { refPose ->
