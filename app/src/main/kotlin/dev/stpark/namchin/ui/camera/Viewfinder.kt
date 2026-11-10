@@ -27,7 +27,7 @@ import kotlin.math.abs
 
 private const val ANALYSIS_ASPECT = 3f / 4f
 
-/** 줌 상태: 현재 배율과 카메라가 지원하는 범위 (카메라 준비 전엔 range = null). */
+/** 줌 상태: 현재 배율과 카메라가 지원하는 범위 (카메라 준비 전엔 range = null). 표시용. */
 internal data class ZoomState(val ratio: Float, val range: ClosedFloatingPointRange<Float>?)
 
 /**
@@ -41,6 +41,7 @@ internal fun Viewfinder(
     ghostAlpha: Float,
     zoom: ZoomState,
     onZoom: (Float) -> Unit,
+    onPinch: (Float) -> Unit,
     onGrid: (Boolean) -> Unit,
     onCameraReady: (Camera, ImageCapture) -> Unit,
     flash: Boolean,
@@ -48,18 +49,16 @@ internal fun Viewfinder(
 ) {
     val reference = state.reference
     val aligned = state.output?.aligned == true
-    // 제스처 블록은 범위가 바뀔 때만 다시 시작하므로, 배율·콜백은 항상 최신 값을 읽게 한다
-    val currentZoom by rememberUpdatedState(zoom)
-    val currentOnZoom by rememberUpdatedState(onZoom)
+    // 제스처 블록은 범위가 바뀔 때만 다시 시작하므로 콜백은 최신 것을 부른다.
+    // 배율 계산은 부모가 실제 상태로 한다 (여기서 받은 zoom.ratio는 다음 화면 갱신 전까지 옛 값)
+    val currentOnPinch by rememberUpdatedState(onPinch)
     Box(
         Modifier
             .fillMaxWidth()
             .aspectRatio(ANALYSIS_ASPECT)
             .pointerInput(zoom.range) {
-                val range = zoom.range ?: return@pointerInput
-                detectTransformGestures { _, _, scale, _ ->
-                    currentOnZoom(ZoomLogic.pinch(currentZoom.ratio, scale, range.start, range.endInclusive))
-                }
+                if (zoom.range == null) return@pointerInput
+                detectTransformGestures { _, _, scale, _ -> currentOnPinch(scale) }
             },
     ) {
         CameraPreview(

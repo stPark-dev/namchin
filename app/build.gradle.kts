@@ -10,6 +10,9 @@ plugins {
 val keystoreProps = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
     Properties().apply { file.inputStream().use(::load) }
 }
+if (keystoreProps == null) logger.warn("keystore.properties 없음: 릴리스 APK가 서명 없이 만들어져 설치할 수 없습니다")
+fun signingProp(key: String): String =
+    requireNotNull(keystoreProps?.getProperty(key)) { "keystore.properties에 $key 가 없습니다" }
 
 android {
     namespace = "dev.stpark.namchin"
@@ -29,10 +32,11 @@ android {
     signingConfigs {
         if (keystoreProps != null) {
             create("release") {
-                storeFile = file(keystoreProps.getProperty("storeFile"))
-                storePassword = keystoreProps.getProperty("storePassword")
-                keyAlias = keystoreProps.getProperty("keyAlias")
-                keyPassword = keystoreProps.getProperty("keyPassword")
+                // 상대 경로는 keystore.properties가 있는 저장소 루트 기준
+                storeFile = rootProject.file(signingProp("storeFile"))
+                storePassword = signingProp("storePassword")
+                keyAlias = signingProp("keyAlias")
+                keyPassword = signingProp("keyPassword")
             }
         }
     }

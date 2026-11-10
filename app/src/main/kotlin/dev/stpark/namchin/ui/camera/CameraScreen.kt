@@ -57,6 +57,7 @@ import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.CardOrder
 import dev.stpark.namchin.camera.ShutterGate
+import dev.stpark.namchin.camera.ZoomLogic
 import dev.stpark.namchin.capture.PhotoSaver
 import dev.stpark.namchin.core.tagging.Tag
 import dev.stpark.namchin.data.Reference
@@ -226,6 +227,9 @@ private fun CameraContent(
                 ghostAlpha = ghostAlpha,
                 zoom = ZoomState(zoomRatio, zoomRange),
                 onZoom = ::setZoom,
+                onPinch = { scale ->
+                    zoomRange?.let { setZoom(ZoomLogic.pinch(zoomRatio, scale, it.start, it.endInclusive)) }
+                },
                 onGrid = { settingsStore.update(appSettings.copy(grid = it)) },
                 onCameraReady = { cam, capture ->
                     camera = cam
