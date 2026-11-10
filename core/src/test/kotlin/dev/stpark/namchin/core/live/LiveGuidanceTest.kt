@@ -154,4 +154,14 @@ class LiveGuidanceTest {
 
         assertTrue(out.cues.isEmpty())
     }
+
+    @Test
+    fun `basic mode adds composition coaching after level`() {
+        val small = pose(STANDING.transformed(scale = 0.8f, dx = 0.1f, dy = 0f))
+
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), small, rollDegrees = 6f, nowMs = 0)
+
+        assertEquals(Guidance.Level(Rotation.COUNTERCLOCKWISE), out.display)
+        assertTrue(Guidance.FeetToBottom in out.cues)
+    }
 }

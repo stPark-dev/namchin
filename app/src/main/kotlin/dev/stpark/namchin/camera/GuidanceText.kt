@@ -21,6 +21,18 @@ object GuidanceText {
         Guidance.TiltDown -> R.string.guide_tilt_down
         Guidance.PanLeft -> R.string.guide_pan_left
         Guidance.PanRight -> R.string.guide_pan_right
+        Guidance.HeadCut -> R.string.guide_head_cut
+        Guidance.FeetToBottom -> R.string.guide_feet_to_bottom
+        Guidance.TooMuchHeadroom -> R.string.guide_too_much_headroom
+        is Guidance.CutAtJoint -> when (cue.point) {
+            Guidance.CutPoint.ANKLE -> R.string.guide_cut_ankle
+            Guidance.CutPoint.KNEE -> R.string.guide_cut_knee
+            Guidance.CutPoint.WRIST -> R.string.guide_cut_wrist
+        }
+        is Guidance.GazeSpace -> when (cue.side) {
+            Guidance.Side.LEFT -> R.string.guide_gaze_left
+            Guidance.Side.RIGHT -> R.string.guide_gaze_right
+        }
         is Guidance.Pose -> when (cue.part) {
             BodyPart.LEFT_UPPER_ARM -> R.string.guide_pose_left_upper_arm
             BodyPart.LEFT_FOREARM -> R.string.guide_pose_left_forearm

@@ -1,5 +1,6 @@
 package dev.stpark.namchin.core.live
 
+import dev.stpark.namchin.core.composition.CompositionAnalyzer
 import dev.stpark.namchin.core.framing.FramingAnalyzer
 import dev.stpark.namchin.core.framing.PersonFrame
 import dev.stpark.namchin.core.guidance.Guidance
@@ -47,12 +48,12 @@ data class LiveOutput(
 object LiveGuidance {
 
     /**
-     * 기본 모드(레퍼런스 없음). 지금은 수평만 본다 — 구도 규칙은 Phase 5에서 추가.
+     * 기본 모드(레퍼런스 없음): 수평 + 일반 구도 규칙.
      * 풍경만 찍을 수도 있으니 인물이 없어도 재촉하지 않는다. 자동 셔터가 없으므로 aligned는 항상 false.
      */
-    @Suppress("UNUSED_PARAMETER")
     fun stepBasic(state: LiveState, current: PersonPose?, rollDegrees: Float?, nowMs: Long): Pair<LiveState, LiveOutput> {
-        val cues = listOfNotNull(rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) })
+        val cues = listOfNotNull(rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) }) +
+            (current?.let { CompositionAnalyzer.analyze(it, state.previousCues) } ?: emptyList())
         val decision = GuidancePrioritizer.decide(cues, state.guidance, nowMs)
         val nextState = state.copy(previousCues = cues, guidance = decision.state)
         return nextState to LiveOutput(decision.display, cues, decision.announce, aligned = false, match = null)

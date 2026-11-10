@@ -64,4 +64,13 @@
     <string name="deck_close">닫기</string>
     <string name="deck_empty">아직 레퍼런스가 없어요.</string>
     <string name="deck_add">레퍼런스 추가하러 가기</string>
+
+    <string name="guide_head_cut">머리가 잘려요. 폰을 위로 살짝 기울이세요</string>
+    <string name="guide_feet_to_bottom">폰을 무릎 높이로 낮추고 발끝을 화면 아래에 맞추세요</string>
+    <string name="guide_too_much_headroom">머리 위가 너무 비어요. 폰을 아래로 살짝 기울이세요</string>
+    <string name="guide_cut_ankle">발목에서 잘려요. 발끝까지 담거나 무릎 위로 자르세요</string>
+    <string name="guide_cut_knee">무릎에서 잘려요. 조금 더 담거나 허벅지 중간에서 자르세요</string>
+    <string name="guide_cut_wrist">손이 화면 끝에 걸려요. 손까지 담아주세요</string>
+    <string name="guide_gaze_left">여자친구가 보는 왼쪽에 여백을 두세요. 폰을 왼쪽으로 돌리세요</string>
+    <string name="guide_gaze_right">여자친구가 보는 오른쪽에 여백을 두세요. 폰을 오른쪽으로 돌리세요</string>
 </resources>

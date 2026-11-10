@@ -18,7 +18,12 @@ class GuidanceTextTest {
         Guidance.TiltDown,
         Guidance.PanLeft,
         Guidance.PanRight,
-    ) + BodyPart.entries.map { Guidance.Pose(it) }
+        Guidance.HeadCut,
+        Guidance.FeetToBottom,
+        Guidance.TooMuchHeadroom,
+    ) + BodyPart.entries.map { Guidance.Pose(it) } +
+        Guidance.CutPoint.entries.map { Guidance.CutAtJoint(it) } +
+        Guidance.Side.entries.map { Guidance.GazeSpace(it) }
 
     @Test
     fun `every cue has its own message`() {
