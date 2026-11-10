@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.stpark.namchin.ui.camera.CameraScreen
 import dev.stpark.namchin.ui.home.HomeScreen
 import dev.stpark.namchin.ui.home.ReferencesViewModel
 import dev.stpark.namchin.ui.importer.ImportRoute
@@ -44,7 +45,9 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
             onSharedConsumed()
         }
     }
-    BackHandler(enabled = screen != Screen.Home) { screen = Screen.Home }
+    BackHandler(enabled = screen != Screen.Home) {
+        screen = (screen as? Screen.Camera)?.let { Screen.Detail(it.referenceId) } ?: Screen.Home
+    }
 
     Surface {
         when (val s = screen) {
@@ -68,6 +71,7 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
                 if (reference != null) {
                     ReferenceDetailScreen(
                         reference = reference,
+                        onShoot = { screen = Screen.Camera(s.id) },
                         onDelete = {
                             referencesVm.delete(s.id)
                             screen = Screen.Home
@@ -76,6 +80,10 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
                     )
                 }
             }
+            is Screen.Camera -> CameraScreen(
+                referenceId = s.referenceId,
+                onBack = { screen = Screen.Detail(s.referenceId) },
+            )
         }
     }
 }

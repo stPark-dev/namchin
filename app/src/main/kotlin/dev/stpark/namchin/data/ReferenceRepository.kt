@@ -31,6 +31,8 @@ class ReferenceRepository(private val dao: ReferenceDao, private val imageDir: F
     fun observeAll(): Flow<List<Reference>> =
         dao.observeAll().map { list -> list.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
+    suspend fun get(id: Long): Reference? = withContext(Dispatchers.IO) { dao.get(id)?.toDomain() }
+
     /**
      * 크롭된 이미지를 앱 저장소에 JPEG로 쓰고 DB에 등록한다.
      * 호출한 화면이 사라져도 파일·DB가 어긋나지 않게 취소 불가로 끝까지 수행한다.

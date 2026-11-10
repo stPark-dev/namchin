@@ -12,6 +12,7 @@ class ScreenTest {
             Screen.Home,
             Screen.Import(uri = "content://media/picker/0/x/1", token = "abc"),
             Screen.Detail(id = 42),
+            Screen.Camera(referenceId = 7),
         ).forEach { assertEquals(it, Screen.restore(Screen.save(it))) }
     }
 
@@ -20,6 +21,7 @@ class ScreenTest {
         assertNull(Screen.restore(listOf("Nope")))
         assertNull(Screen.restore(listOf("Detail", "not-a-number")))
         assertNull(Screen.restore(emptyList()))
+        assertNull(Screen.restore(listOf("Camera")))
     }
 
     @Test

@@ -18,7 +18,12 @@ private val UNRELIABLE = Color(0xFFFF5252)
 
 /** 이미지와 같은 크기·비율의 영역 위에 골격을 그린다. 신뢰도 낮은 관절은 빨간 점. */
 @Composable
-fun SkeletonOverlay(pose: PersonPose?, modifier: Modifier = Modifier, stroke: Dp = 2.dp) {
+fun SkeletonOverlay(
+    pose: PersonPose?,
+    modifier: Modifier = Modifier,
+    stroke: Dp = 2.dp,
+    color: Color = RELIABLE,
+) {
     if (pose == null) return
     Canvas(modifier.clipToBounds()) {
         fun Point.toOffset() = Offset(x * size.width, y * size.height)
@@ -26,11 +31,11 @@ fun SkeletonOverlay(pose: PersonPose?, modifier: Modifier = Modifier, stroke: Dp
         BodyPart.entries.forEach { part ->
             val from = pose.reliable(part.from, PoseSimilarity.MIN_CONFIDENCE) ?: return@forEach
             val to = pose.reliable(part.to, PoseSimilarity.MIN_CONFIDENCE) ?: return@forEach
-            drawLine(RELIABLE, from.toOffset(), to.toOffset(), strokeWidth = width)
+            drawLine(color, from.toOffset(), to.toOffset(), strokeWidth = width)
         }
         pose.keypoints.values.forEach {
-            val color = if (it.confidence >= PoseSimilarity.MIN_CONFIDENCE) RELIABLE else UNRELIABLE
-            drawCircle(color, radius = width * 1.5f, center = it.position.toOffset())
+            val dot = if (it.confidence >= PoseSimilarity.MIN_CONFIDENCE) color else UNRELIABLE
+            drawCircle(dot, radius = width * 1.5f, center = it.position.toOffset())
         }
     }
 }

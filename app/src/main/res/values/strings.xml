@@ -23,4 +23,32 @@
     <string name="back">뒤로</string>
     <string name="cancel">취소</string>
     <string name="delete">삭제</string>
+    <string name="detail_shoot">이 사진으로 촬영</string>
+
+    <string name="camera_permission_needed">촬영 가이드를 쓰려면 카메라 권한이 필요해요.</string>
+    <string name="camera_permission_grant">권한 허용</string>
+    <string name="camera_ghost">레퍼런스 겹쳐 보기</string>
+    <string name="camera_aligned">좋아요! 그대로 유지</string>
+    <string name="camera_no_reference_pose">레퍼런스에서 인물을 찾지 못해 안내를 할 수 없어요.</string>
+    <string name="camera_stats">분석 %1$dms · %2$.0f fps · 포즈 %3$s</string>
+
+    <string name="guide_no_person">여자친구 어깨까지 화면에 담아주세요</string>
+    <string name="guide_level_cw">폰을 시계 방향으로 살짝 돌려 수평을 맞추세요</string>
+    <string name="guide_level_ccw">폰을 반시계 방향으로 살짝 돌려 수평을 맞추세요</string>
+    <string name="guide_move_closer">앞으로 다가가세요</string>
+    <string name="guide_move_back">뒤로 물러나세요</string>
+    <string name="guide_tilt_up">폰을 위로 살짝 기울이세요</string>
+    <string name="guide_tilt_down">폰을 아래로 살짝 기울이세요</string>
+    <string name="guide_pan_left">폰을 왼쪽으로 돌리세요</string>
+    <string name="guide_pan_right">폰을 오른쪽으로 돌리세요</string>
+    <string name="guide_pose_left_upper_arm">여자친구 왼쪽 위팔을 레퍼런스처럼</string>
+    <string name="guide_pose_left_forearm">여자친구 왼쪽 아래팔을 레퍼런스처럼</string>
+    <string name="guide_pose_right_upper_arm">여자친구 오른쪽 위팔을 레퍼런스처럼</string>
+    <string name="guide_pose_right_forearm">여자친구 오른쪽 아래팔을 레퍼런스처럼</string>
+    <string name="guide_pose_left_torso">여자친구 상체 기울기(왼쪽)를 레퍼런스처럼</string>
+    <string name="guide_pose_right_torso">여자친구 상체 기울기(오른쪽)를 레퍼런스처럼</string>
+    <string name="guide_pose_left_thigh">여자친구 왼쪽 허벅지를 레퍼런스처럼</string>
+    <string name="guide_pose_left_shin">여자친구 왼쪽 종아리를 레퍼런스처럼</string>
+    <string name="guide_pose_right_thigh">여자친구 오른쪽 허벅지를 레퍼런스처럼</string>
+    <string name="guide_pose_right_shin">여자친구 오른쪽 종아리를 레퍼런스처럼</string>
 </resources>

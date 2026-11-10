@@ -15,17 +15,21 @@ sealed interface Screen {
 
     data class Detail(val id: Long) : Screen
 
+    data class Camera(val referenceId: Long) : Screen
+
     companion object {
         fun save(screen: Screen): List<String> = when (screen) {
             Home -> listOf("Home")
             is Import -> listOf("Import", screen.uri, screen.token)
             is Detail -> listOf("Detail", screen.id.toString())
+            is Camera -> listOf("Camera", screen.referenceId.toString())
         }
 
         fun restore(saved: List<String>): Screen? = when (saved.firstOrNull()) {
             "Home" -> Home
             "Import" -> if (saved.size == 3) Import(saved[1], saved[2]) else null
             "Detail" -> saved.getOrNull(1)?.toLongOrNull()?.let { Detail(it) }
+            "Camera" -> saved.getOrNull(1)?.toLongOrNull()?.let { Camera(it) }
             else -> null
         }
     }

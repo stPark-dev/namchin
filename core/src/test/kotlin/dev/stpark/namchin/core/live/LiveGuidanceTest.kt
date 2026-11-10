@@ -1,0 +1,97 @@
+package dev.stpark.namchin.core.live
+
+import dev.stpark.namchin.core.guidance.Guidance
+import dev.stpark.namchin.core.guidance.GuidancePrioritizer.STABLE_MS
+import dev.stpark.namchin.core.guidance.Rotation
+import dev.stpark.namchin.core.model.Joint
+import dev.stpark.namchin.core.model.PersonPose
+import dev.stpark.namchin.core.model.Point
+import dev.stpark.namchin.core.testutil.STANDING
+import dev.stpark.namchin.core.testutil.mirrored
+import dev.stpark.namchin.core.testutil.pose
+import dev.stpark.namchin.core.testutil.transformed
+import dev.stpark.namchin.core.testutil.with
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class LiveGuidanceTest {
+
+    private val rightArmRaised = STANDING.with(
+        Joint.RIGHT_ELBOW to Point(0.35f, 0.30f),
+        Joint.RIGHT_WRIST to Point(0.25f, 0.30f),
+    )
+    private val reference = pose(rightArmRaised)
+
+    private fun step(
+        current: PersonPose?,
+        state: LiveState = LiveState(),
+        roll: Float = 0f,
+        now: Long = 0,
+        poseEnabled: Boolean = true,
+    ) = LiveGuidance.step(state, LiveInput(reference, current, roll, poseEnabled, now))
+
+    @Test
+    fun `matching person is aligned with nothing to say`() {
+        val (_, out) = step(pose(rightArmRaised))
+
+        assertTrue(out.aligned)
+        assertNull(out.display)
+        assertEquals(1f, out.match!!.score, 1e-4f)
+    }
+
+    @Test
+    fun `missing person asks to get her in frame`() {
+        val (_, out) = step(current = null)
+
+        assertFalse(out.aligned)
+        assertEquals(Guidance.NoPerson, out.display)
+    }
+
+    @Test
+    fun `framing cue is displayed at once and announced after it is stable`() {
+        val tooSmall = pose(rightArmRaised.transformed(scale = 0.5f, dx = 0.25f, dy = 0.15f))
+
+        val (s1, first) = step(tooSmall, now = 0)
+        val (_, later) = step(tooSmall, state = s1, now = STABLE_MS)
+
+        assertEquals(Guidance.MoveCloser, first.display)
+        assertNull(first.announce)
+        assertEquals(Guidance.MoveCloser, later.announce)
+    }
+
+    @Test
+    fun `wrong arm gives a pose cue`() {
+        val (_, out) = step(pose(STANDING))
+
+        assertFalse(out.aligned)
+        assertTrue(out.display is Guidance.Pose)
+    }
+
+    @Test
+    fun `mirror choice is remembered for the next frame`() {
+        val (state, out) = step(pose(rightArmRaised.mirrored()))
+
+        assertTrue(out.match!!.mirrored)
+        assertTrue(state.preferMirrored)
+    }
+
+    @Test
+    fun `previous cues feed hysteresis`() {
+        val (s1, first) = step(pose(rightArmRaised), roll = 5f)
+        val (_, second) = step(pose(rightArmRaised), state = s1, roll = 2.5f)
+
+        assertEquals(Guidance.Level(Rotation.COUNTERCLOCKWISE), first.display)
+        assertEquals(Guidance.Level(Rotation.COUNTERCLOCKWISE), second.display)
+    }
+
+    @Test
+    fun `pose can be disabled for night mode`() {
+        val (_, out) = step(pose(STANDING), poseEnabled = false)
+
+        assertTrue(out.aligned)
+        assertNull(out.match)
+    }
+}

@@ -49,6 +49,10 @@ dependencies {
     implementation(libs.mlkit.pose.accurate)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(platform(libs.junit.bom))
