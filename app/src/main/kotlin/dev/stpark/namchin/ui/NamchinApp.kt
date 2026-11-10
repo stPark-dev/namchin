@@ -11,8 +11,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,25 +23,24 @@ import dev.stpark.namchin.ui.home.ReferencesViewModel
 import dev.stpark.namchin.ui.importer.ImportRoute
 import dev.stpark.namchin.ui.reference.ReferenceDetailScreen
 
-private sealed interface Screen {
-    data object Home : Screen
-    data class Import(val uri: Uri) : Screen
-    data class Detail(val id: Long) : Screen
-}
+private val ScreenSaver = listSaver<Screen, String>(
+    save = { Screen.save(it) },
+    restore = { Screen.restore(it) ?: Screen.Home },
+)
 
 /** @param sharedUri 다른 앱에서 공유로 받은 이미지 (처리 후 onSharedConsumed 호출) */
 @Composable
 fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
-    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var screen by rememberSaveable(stateSaver = ScreenSaver) { mutableStateOf<Screen>(Screen.Home) }
     val referencesVm: ReferencesViewModel = viewModel()
     val references by referencesVm.references.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
-        uri?.let { screen = Screen.Import(it) }
+        uri?.let { screen = Screen.Import.new(it.toString()) }
     }
 
     LaunchedEffect(sharedUri) {
         sharedUri?.let {
-            screen = Screen.Import(it)
+            screen = Screen.Import.new(it.toString())
             onSharedConsumed()
         }
     }
@@ -55,13 +55,16 @@ fun NamchinApp(sharedUri: Uri?, onSharedConsumed: () -> Unit) {
             )
             is Screen.Import -> Box(Modifier.safeDrawingPadding()) {
                 ImportRoute(
-                    uri = s.uri,
+                    import = s,
                     onSaved = { screen = Screen.Detail(it) },
                     onCancel = { screen = Screen.Home },
                 )
             }
             is Screen.Detail -> {
-                val reference = references?.firstOrNull { it.id == s.id }
+                val loaded = references
+                val reference = loaded?.firstOrNull { it.id == s.id }
+                // 목록은 불러왔는데 없으면(삭제됨) 홈으로
+                LaunchedEffect(loaded, reference) { if (loaded != null && reference == null) screen = Screen.Home }
                 if (reference != null) {
                     ReferenceDetailScreen(
                         reference = reference,

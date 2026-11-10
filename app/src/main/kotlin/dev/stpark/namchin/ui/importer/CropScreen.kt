@@ -68,12 +68,20 @@ private fun CropOverlay(rect: NormRect, onRectChange: (NormRect) -> Unit, modifi
     val currentOnChange by rememberUpdatedState(onRectChange)
     Canvas(
         modifier.pointerInput(Unit) {
+            // 드래그 시작 시점의 사각형에 누적 이동량을 적용 → 상태 갱신 지연·경계 걸림과 무관하게 손가락을 따라간다
             var corner = Corner.TOP_LEFT
+            var startRect = currentRect
+            var total = Offset.Zero
             detectDragGestures(
-                onDragStart = { start -> corner = nearestCorner(currentRect, start, size.width, size.height) },
+                onDragStart = { start ->
+                    startRect = currentRect
+                    total = Offset.Zero
+                    corner = nearestCorner(startRect, start, size.width, size.height)
+                },
                 onDrag = { change, drag ->
                     change.consume()
-                    currentOnChange(CropGeometry.drag(currentRect, corner, drag.x / size.width, drag.y / size.height))
+                    total += drag
+                    currentOnChange(CropGeometry.drag(startRect, corner, total.x / size.width, total.y / size.height))
                 },
             )
         },
