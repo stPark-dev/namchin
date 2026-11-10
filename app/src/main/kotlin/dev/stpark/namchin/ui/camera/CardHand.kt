@@ -39,6 +39,11 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.stpark.namchin.R
 import dev.stpark.namchin.data.Reference
+import dev.stpark.namchin.ui.theme.Brand
+import dev.stpark.namchin.ui.theme.Jua
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.sp
 import java.io.File
 
 private val CARD_SHAPE = RoundedCornerShape(10.dp)
@@ -53,7 +58,7 @@ fun ReferenceCard(reference: Reference, modifier: Modifier = Modifier) {
         modifier = modifier
             .shadow(6.dp, CARD_SHAPE)
             .clip(CARD_SHAPE)
-            .border(BorderStroke(2.dp, Color.White), CARD_SHAPE)
+            .border(BorderStroke(2.dp, Brand.Paper), CARD_SHAPE)
             .background(Color.DarkGray),
     )
 }
@@ -118,7 +123,7 @@ fun CardDeck(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color(0xE6000000))
+            .background(Brand.Ink.copy(alpha = 0.94f))
             .clickable(onClick = onClose)
             .safeDrawingPadding(),
     ) {
@@ -126,15 +131,19 @@ fun CardDeck(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.deck_title),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
+                    color = Brand.Paper,
+                    fontFamily = Jua,
+                    fontSize = 22.sp,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onClose) { Text(stringResource(R.string.deck_close)) }
+                TextButton(onClick = onClose) {
+                    Text(stringResource(R.string.deck_close), color = Brand.Yellow, fontFamily = Jua, fontSize = 16.sp)
+                }
             }
             if (references.isEmpty()) {
                 Column(Modifier.fillMaxSize(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.deck_empty), color = Color.White)
+                    Image(painterResource(R.drawable.brand_symbol_on_dark), null, Modifier.size(120.dp))
+                    Text(stringResource(R.string.deck_empty), color = Brand.Paper, fontFamily = Jua, fontSize = 18.sp)
                     Button(onClick = onAddReference, modifier = Modifier.padding(top = 16.dp)) {
                         Text(stringResource(R.string.deck_add))
                     }
@@ -168,12 +177,12 @@ fun AppliedReferenceChip(reference: Reference, onClear: () -> Unit, modifier: Mo
         ReferenceCard(reference, Modifier.fillMaxSize().padding(top = 8.dp, end = 8.dp))
         Text(
             "✕",
-            color = Color.White,
+            color = Brand.Ink,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .clip(RoundedCornerShape(50))
-                .background(Color(0xFFE53935))
+                .background(Brand.Yellow)
                 .clickable(onClick = onClear)
                 .padding(horizontal = 7.dp, vertical = 1.dp),
         )

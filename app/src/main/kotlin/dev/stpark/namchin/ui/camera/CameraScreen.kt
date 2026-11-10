@@ -47,6 +47,15 @@ import dev.stpark.namchin.camera.FeedbackSettings
 import dev.stpark.namchin.camera.GuideVoice
 import dev.stpark.namchin.camera.Haptics
 import dev.stpark.namchin.settings.AppSettingsStore
+import dev.stpark.namchin.ui.theme.Brand
+import dev.stpark.namchin.ui.theme.Jua
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.LifecycleEventObserver
@@ -99,7 +108,7 @@ fun CameraScreen(
     val request = rememberLauncherForActivityResult(RequestPermission()) { granted = it }
     LaunchedEffect(Unit) { if (!granted) request.launch(Manifest.permission.CAMERA) }
 
-    Box(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
+    Box(Modifier.fillMaxSize().background(Brand.Ink).safeDrawingPadding()) {
         if (granted) {
             CameraContent(referenceId, references, onSelectReference, onOpenLibrary, onOpenSettings)
         } else {
@@ -108,7 +117,8 @@ fun CameraScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(stringResource(R.string.camera_permission_needed), color = Color.White)
+                Image(painterResource(R.drawable.brand_symbol_on_dark), null, Modifier.size(140.dp))
+                Text(stringResource(R.string.camera_permission_needed), color = Brand.Paper, fontFamily = Jua, fontSize = 18.sp)
                 Button(onClick = { request.launch(Manifest.permission.CAMERA) }) {
                     Text(stringResource(R.string.camera_permission_grant))
                 }
@@ -230,7 +240,7 @@ private fun CameraContent(
             ) {
                 if (reference != null) AppliedReferenceChip(reference, onClear = { onSelectReference(null) })
                 GuidanceBanner(state, Modifier.weight(1f))
-                TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_title)) }
+                BrandChip(stringResource(R.string.settings_title), selected = false, onClick = onOpenSettings)
             }
             Box(
                 Modifier
@@ -257,6 +267,7 @@ private fun CameraContent(
                 if (region != null) {
                     if (reference != null) StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
                     LiveSkeleton(state.current, region, state.output?.aligned == true, Modifier.fillMaxSize())
+                    ViewfinderCorners(region, aligned = state.output?.aligned == true, Modifier.fillMaxSize())
                 }
                 val roll = state.rollDegrees
                 val level = state.output?.let { out -> out.cues.none { it is Guidance.Level } }
@@ -280,18 +291,29 @@ private fun CameraContent(
                 message?.let {
                     Text(
                         stringResource(it),
-                        color = Color.White,
+                        color = Brand.Yellow,
+                        fontFamily = Jua,
+                        fontSize = 18.sp,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .background(Color(0xAA000000), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .background(Brand.Ink.copy(alpha = 0.9f), RoundedCornerShape(50))
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
                     )
                 }
             }
             if (reference != null) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.camera_ghost), color = Color.White, fontSize = 12.sp)
-                    Slider(value = ghostAlpha, onValueChange = { ghostAlpha = it }, modifier = Modifier.padding(start = 12.dp).weight(1f))
+                    Text(stringResource(R.string.camera_ghost), color = Brand.Paper, fontSize = 14.sp, fontFamily = Jua)
+                    Slider(
+                        value = ghostAlpha,
+                        onValueChange = { ghostAlpha = it },
+                        colors = SliderDefaults.colors(
+                            thumbColor = Brand.Yellow,
+                            activeTrackColor = Brand.Yellow,
+                            inactiveTrackColor = Brand.InkSoft,
+                        ),
+                        modifier = Modifier.padding(start = 12.dp).weight(1f),
+                    )
                 }
             }
             // 셔터 줄: 카드 손패는 이 칸 안의 오른쪽에만 둬서 다른 버튼 터치를 가로채지 않는다
@@ -361,16 +383,23 @@ private fun FeedbackToggles(
 
 @Composable
 private fun Toggle(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
+    // 화면 읽기(TalkBack)가 스위치와 켜짐/꺼짐 상태를 읽도록
+    BrandChip(label, selected = on, modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = onToggle))
+}
+
+/** 노랑(선택) / 반투명 남색(기본) 둥근 칩. 카메라 화면 버튼 공통 모양. */
+@Composable
+private fun BrandChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     Text(
         label,
-        color = if (on) Color.Black else Color.White,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .background(if (on) Color(0xFFFFD600) else Color(0x66000000), RoundedCornerShape(50))
-            // 화면 읽기(TalkBack)가 스위치와 켜짐/꺼짐 상태를 읽도록
-            .toggleable(value = on, role = Role.Switch, onValueChange = onToggle)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+        color = if (selected) Brand.Ink else Brand.Paper,
+        fontSize = 14.sp,
+        fontFamily = Jua,
+        modifier = modifier
+            .background(if (selected) Brand.Yellow else Brand.Ink.copy(alpha = 0.6f), RoundedCornerShape(50))
+            .border(1.dp, if (selected) Brand.Yellow else Brand.Paper.copy(alpha = 0.35f), RoundedCornerShape(50))
+            .let { m -> if (onClick != null) m.clickable(onClick = onClick) else m }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }
 
@@ -380,17 +409,19 @@ private fun ZoomButtons(presets: List<Float>, current: Float, onSelect: (Float) 
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
         presets.forEach { preset ->
             val isSelected = preset == selected
-            TextButton(
-                onClick = { onSelect(preset) },
-                modifier = Modifier.background(
-                    if (isSelected) Color.White.copy(alpha = 0.25f) else Color.Transparent,
-                    CircleShape,
-                ),
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) Brand.Yellow else Brand.Ink.copy(alpha = 0.55f))
+                    .clickable { onSelect(preset) },
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     if (isSelected) ZoomLogic.label(current) else ZoomLogic.label(preset),
-                    color = if (isSelected) Color(0xFFFFD600) else Color.White,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) Brand.Ink else Brand.Paper,
+                    fontFamily = Jua,
+                    fontSize = 14.sp,
                 )
             }
         }
@@ -411,8 +442,8 @@ private fun GuidanceBanner(state: CameraUiState, modifier: Modifier = Modifier) 
     Text(
         text,
         modifier = modifier.padding(horizontal = 8.dp),
-        color = if (output?.aligned == true) Color(0xFF00E676) else Color.White,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.Bold,
+        color = if (output?.aligned == true) Brand.Yellow else Brand.Paper,
+        fontSize = 20.sp,
+        fontFamily = Jua,
     )
 }

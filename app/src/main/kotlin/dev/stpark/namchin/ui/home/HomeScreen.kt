@@ -16,6 +16,13 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,7 +45,13 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.library_title)) },
+                title = {
+                    Image(
+                        painterResource(R.drawable.brand_logo),
+                        contentDescription = stringResource(R.string.app_name),
+                        modifier = Modifier.height(32.dp),
+                    )
+                },
                 navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.library_to_camera)) } },
             )
         },
@@ -49,7 +62,15 @@ fun HomeScreen(
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
             when {
                 references == null -> CircularProgressIndicator()
-                references.isEmpty() -> Text(stringResource(R.string.home_empty), Modifier.padding(32.dp))
+                references.isEmpty() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(painterResource(R.drawable.brand_symbol), null, Modifier.size(140.dp))
+                    Text(
+                        stringResource(R.string.home_empty),
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(32.dp),
+                    )
+                }
                 else -> LazyVerticalStaggeredGrid(
                     columns = StaggeredGridCells.Fixed(3),
                     contentPadding = PaddingValues(8.dp),

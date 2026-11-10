@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 앱 아이콘에서 뽑은 브랜드 색. Compose 쪽은 ui/theme/Color.kt -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="brand_paper">#FDFDFD</color>
+    <color name="brand_ink">#131D2B</color>
+</resources>
