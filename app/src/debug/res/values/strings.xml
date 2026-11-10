@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 런처에서 릴리스 앱과 구분 -->
+    <string name="app_name">남친렌즈 β</string>
+</resources>

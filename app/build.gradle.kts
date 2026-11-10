@@ -42,6 +42,11 @@ android {
     }
 
     buildTypes {
+        // 디버그는 다른 앱으로 설치돼 릴리스 앱(실사용)과 나란히 쓸 수 있다
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
