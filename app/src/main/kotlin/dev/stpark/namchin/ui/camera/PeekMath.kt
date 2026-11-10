@@ -10,6 +10,12 @@ object PeekMath {
     /** 크게 열린 카드의 세로 중심 (화면 높이 비율). 아래에 적용 버튼 자리를 남긴다. */
     const val CENTER_Y_RATIO = 0.42f
 
+    /** 크게 열렸을 때 배경 어둡기. */
+    const val MAX_DIM = 0.8f
+
+    /** 배경 어둡기: 열릴수록 어둡고, 적용해서 칩으로 날아가는 동안 걷힌다. */
+    fun dimAlpha(progress: Float, fly: Float): Float = MAX_DIM * progress * (1f - fly)
+
     /** 손패 카드를 탭하면 끌지 않아도 끝까지 연다. */
     const val TAP_TARGET = 1f
 

@@ -51,6 +51,9 @@ import kotlin.math.roundToInt
 private const val LIFT = 0.06f
 private val SPRING = spring<Float>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
 
+/** 칩으로 날아갈 땐 튕기지 않고 착 붙게. */
+private val FLY_SPRING = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+
 /**
  * 손패 카드 크게 보기 상태. progress 0 = 손패 자리, 1 = 화면 가운데 크게.
  * 손가락을 따라 진행도가 바뀌고, 놓으면 스프링으로 열리거나 돌아간다.
@@ -66,6 +69,11 @@ class CardPeekState(private val scope: CoroutineScope) {
     var fromRotation by mutableFloatStateOf(0f)
         private set
     val progress = Animatable(0f)
+
+    /** 적용 후 왼쪽 위 칩으로 날아가는 진행도 (0 = 가운데, 1 = 칩 자리) */
+    val fly = Animatable(0f)
+    var flyTarget by mutableStateOf(Rect.Zero)
+        private set
     private var drag = 0f
     private var open = false
     private var dragging = false
@@ -119,6 +127,25 @@ class CardPeekState(private val scope: CoroutineScope) {
         }
     }
 
+    /**
+     * 적용: 카드를 왼쪽 위 칩 자리로 날려 보낸 뒤, 도착하면 onArrived(적용).
+     * @param chip 적용된 레퍼런스 칩의 카드 자리 (루트 좌표)
+     */
+    fun applyTo(chip: Rect, onArrived: (Reference) -> Unit) {
+        val target = reference ?: return
+        if (fly.isRunning || fly.value > 0f) return
+        flyTarget = chip
+        dragging = false
+        scope.launch {
+            fly.animateTo(1f, FLY_SPRING)
+            onArrived(target)
+            reference = null
+            open = false
+            progress.snapTo(0f)
+            fly.snapTo(0f)
+        }
+    }
+
     fun dismiss() {
         open = false
         dragging = false
@@ -131,12 +158,13 @@ class CardPeekState(private val scope: CoroutineScope) {
 
 /** 크게 보기 오버레이: 배경이 어두워지고 카드가 손패에서 가운데로 커지며, 열리면 아래에 적용 버튼. */
 @Composable
-fun PeekOverlay(state: CardPeekState, onApply: (Reference) -> Unit, modifier: Modifier = Modifier) {
+fun PeekOverlay(state: CardPeekState, onApply: () -> Unit, modifier: Modifier = Modifier) {
     val reference = state.reference ?: return
     val density = LocalDensity.current
     val distancePx = with(density) { PEEK_DISTANCE.toPx() }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val p = state.progress.value
+    val fly = state.fly.value
 
     BoxWithConstraints(modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
         val w = constraints.maxWidth.toFloat()
@@ -145,17 +173,22 @@ fun PeekOverlay(state: CardPeekState, onApply: (Reference) -> Unit, modifier: Mo
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Brand.Ink.copy(alpha = 0.8f * p))
+                .background(Brand.Ink.copy(alpha = PeekMath.dimAlpha(p, fly)))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    enabled = p > 0.5f,
+                    enabled = p > 0.5f && fly == 0f,
                     onClick = state::dismiss,
                 ),
         )
         val from = PeekMath.Bounds(state.from.left - origin.x, state.from.top - origin.y, state.from.width, state.from.height)
         val target = PeekMath.target(w, h, reference.aspectRatio)
-        val cur = PeekMath.lerp(from, target, p)
+        val chip = PeekMath.Bounds(
+            state.flyTarget.left - origin.x, state.flyTarget.top - origin.y,
+            state.flyTarget.width, state.flyTarget.height,
+        )
+        // 열림(손패 → 가운데) 다음 적용(가운데 → 칩)
+        val cur = PeekMath.lerp(PeekMath.lerp(from, target, p), chip, fly)
         ReferenceCard(
             reference,
             Modifier
@@ -174,12 +207,12 @@ fun PeekOverlay(state: CardPeekState, onApply: (Reference) -> Unit, modifier: Mo
                     )
                 },
         )
-        // 적용 버튼: 거의 다 열렸을 때 나타남
-        val buttonAlpha = ((p - 0.6f) / 0.4f).coerceIn(0f, 1f)
+        // 적용 버튼: 거의 다 열렸을 때 나타나고, 날아가기 시작하면 바로 사라짐
+        val buttonAlpha = ((p - 0.6f) / 0.4f).coerceIn(0f, 1f) * (1f - (fly * 4f).coerceAtMost(1f))
         if (buttonAlpha > 0f) {
             Button(
-                onClick = { onApply(reference) },
-                enabled = p > 0.9f,
+                onClick = onApply,
+                enabled = p > 0.9f && fly == 0f,
                 colors = ButtonDefaults.buttonColors(containerColor = Brand.Yellow, contentColor = Brand.Ink),
                 modifier = Modifier
                     .align(Alignment.TopCenter)

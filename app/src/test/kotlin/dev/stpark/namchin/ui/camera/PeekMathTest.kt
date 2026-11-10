@@ -59,4 +59,12 @@ class PeekMathTest {
     fun `tapping a card opens it fully`() {
         assertEquals(1f, PeekMath.TAP_TARGET)
     }
+
+    @Test
+    fun `background darkens with opening and clears while flying to the chip`() {
+        assertEquals(0f, PeekMath.dimAlpha(progress = 0f, fly = 0f))
+        assertEquals(PeekMath.MAX_DIM, PeekMath.dimAlpha(progress = 1f, fly = 0f))
+        assertEquals(PeekMath.MAX_DIM / 2, PeekMath.dimAlpha(progress = 1f, fly = 0.5f), 1e-6f)
+        assertEquals(0f, PeekMath.dimAlpha(progress = 1f, fly = 1f))
+    }
 }

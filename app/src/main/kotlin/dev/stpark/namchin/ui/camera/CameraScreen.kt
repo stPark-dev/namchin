@@ -45,6 +45,9 @@ import dev.stpark.namchin.settings.AppSettingsStore
 import dev.stpark.namchin.ui.theme.Brand
 import dev.stpark.namchin.review.ReviewState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import dev.stpark.namchin.core.tagging.Tag
 import dev.stpark.namchin.ml.SceneEmbedder
@@ -192,7 +195,9 @@ private fun CameraContent(
     BackHandler(enabled = reviewing) { reviewVm.close() }
     val scope = rememberCoroutineScope()
     val peek = remember { CardPeekState(scope) }
-    val peekDistancePx = with(LocalDensity.current) { PEEK_DISTANCE.toPx() }
+    val density = LocalDensity.current
+    val peekDistancePx = with(density) { PEEK_DISTANCE.toPx() }
+    var chipSlot by remember { mutableStateOf(Rect.Zero) }
     BackHandler(enabled = peek.active) { peek.dismiss() }
     // 카드 목록·결과 화면·크게 보기가 떠 있는 동안 자동 셔터를 멈춘다
     LaunchedEffect(deckOpen, reviewing, peek.active) { vm.pauseAutoShutter(deckOpen || reviewing || peek.active) }
@@ -268,7 +273,10 @@ private fun CameraContent(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 64.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (reference != null) AppliedReferenceChip(reference, onClear = { onSelectReference(null) })
+                // 칩 자리: 크게 보기에서 적용하면 카드가 이 자리로 날아온다
+                Box(Modifier.size(CHIP_WIDTH, CHIP_HEIGHT).onGloballyPositioned { chipSlot = it.boundsInRoot() }) {
+                    if (reference != null) AppliedReferenceChip(reference, onClear = { onSelectReference(null) })
+                }
                 Spacer(Modifier.weight(1f))
                 if (state.lowLight) NightBadge(Modifier.padding(end = 8.dp))
                 IconButton(onClick = onOpenSettings) {
@@ -379,9 +387,11 @@ private fun CameraContent(
         }
         PeekOverlay(
             state = peek,
-            onApply = { reference ->
-                onSelectReference(reference.id)
-                peek.dismiss()
+            onApply = {
+                // 칩 안의 카드 자리 (AppliedReferenceChip의 위·오른쪽 여백을 뺀 영역)
+                val inset = with(density) { CHIP_CARD_INSET.toPx() }
+                val card = Rect(chipSlot.left, chipSlot.top + inset, chipSlot.right - inset, chipSlot.bottom)
+                peek.applyTo(card) { onSelectReference(it.id) }
             },
         )
         ResultOverlay(
@@ -412,5 +422,8 @@ private fun CameraContent(
 }
 
 private const val FLASH_MS = 80L
+private val CHIP_WIDTH = 64.dp
+private val CHIP_HEIGHT = 80.dp
+private val CHIP_CARD_INSET = 8.dp
 private const val BURST_COUNT = 3
 private const val MESSAGE_MS = 1_500L
