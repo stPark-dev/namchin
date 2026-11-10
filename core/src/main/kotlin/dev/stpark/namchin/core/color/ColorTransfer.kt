@@ -37,7 +37,8 @@ class ColorStats(val mean: DoubleArray, val std: DoubleArray) {
  *
  * @param strength 0 = 원본, 1 = 레퍼런스 색감 그대로
  * @param keepLightness true면 밝기(L)는 원본 그대로, 색(a·b)만 레퍼런스를 따른다
- *   (어두운 레퍼런스 때문에 사진까지 어두워지지 않게)
+ *   (어두운 레퍼런스 때문에 사진까지 어두워지지 않게). 아주 밝거나 어둡거나 진한 색은 옮긴 색을
+ *   다 담을 수 없어 잘리면 밝기가 바뀌므로, 담을 수 있는 만큼만 옮긴다.
  */
 class ColorTransfer(
     private val source: ColorStats,
@@ -57,7 +58,27 @@ class ColorTransfer(
             val moved = (lab[c] - source.mean[c]) * scale[c] + reference.mean[c]
             lab[c] + strength * (moved - lab[c])
         }
+        if (keepLightness) fitInGamut(lab, out)
         return ColorLab.toArgb(out, (argb ushr 24) and 0xFF)
+    }
+
+    /**
+     * 밝기는 그대로 두고, 색을 원본(항상 표현 가능)에서 목표 쪽으로 표현 가능한 데까지만 옮긴다.
+     * 원본과 목표 사이를 이분 탐색한다.
+     */
+    private fun fitInGamut(original: DoubleArray, out: DoubleArray) {
+        val l = out[L]
+        if (ColorLab.inGamut(l, out[1], out[2])) return
+        val da = out[1] - original[1]
+        val db = out[2] - original[2]
+        var lo = 0.0
+        var hi = 1.0
+        repeat(GAMUT_STEPS) {
+            val mid = (lo + hi) / 2
+            if (ColorLab.inGamut(l, original[1] + da * mid, original[2] + db * mid)) lo = mid else hi = mid
+        }
+        out[1] = original[1] + da * lo
+        out[2] = original[2] + db * lo
     }
 
     companion object {
@@ -65,5 +86,6 @@ class ColorTransfer(
         const val MAX_SCALE = 2.0
         private const val MIN_STD = 1e-3
         private const val L = 0
+        private const val GAMUT_STEPS = 12
     }
 }

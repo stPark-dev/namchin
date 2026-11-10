@@ -120,12 +120,26 @@ class ColorTransferTest {
         val darkBlue = image(40, 60, 110)
         val transfer = ColorTransfer(ColorStats.of(photo), ColorStats.of(darkBlue), keepLightness = true)
 
-        photo.take(50).forEach { c ->
+        photo.take(200).forEach { c ->
             val before = ColorLab.fromArgb(c)
             val after = ColorLab.fromArgb(transfer.apply(c))
-            // 8비트 RGB로 되돌릴 때 반올림·색 범위 밖 잘림만큼은 흔들린다 (사람 눈엔 같은 밝기)
-            assertEquals(before[0], after[0], 2.0, "L")
+            // 남는 오차는 8비트 RGB로 되돌릴 때 반올림뿐
+            assertEquals(before[0], after[0], 0.5, "L")
             assertTrue(after[2] < before[2] - 5, "더 푸르게 (b 감소): ${before[2]} -> ${after[2]}")
+        }
+    }
+
+    @Test
+    fun `keeping lightness holds even where the shifted colour cannot be shown`() {
+        // 흰색·아주 어두운 색·짙은 파랑은 색을 담을 여유가 없어 그대로 옮기면 잘리며 밝기가 바뀐다
+        val warm = image(220, 170, 120)
+        val teal = image(40, 150, 160)
+        val transfer = ColorTransfer(ColorStats.of(warm), ColorStats.of(teal), keepLightness = true)
+
+        listOf(argb(255, 255, 255), argb(20, 20, 20), argb(0, 0, 160), argb(250, 40, 30), argb(5, 5, 5)).forEach { c ->
+            val before = ColorLab.fromArgb(c)[0]
+            val after = ColorLab.fromArgb(transfer.apply(c))[0]
+            assertEquals(before, after, 1.0, "L of ${Integer.toHexString(c)}")
         }
     }
 

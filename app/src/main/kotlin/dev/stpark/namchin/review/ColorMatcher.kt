@@ -19,7 +19,7 @@ import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.coroutineScope
 
 /** 레퍼런스 색감 따라하기: 변환표 만들기, 미리보기, 원본 해상도로 새 파일 저장. 느리므로 백그라운드에서 부른다. */
 object ColorMatcher {
@@ -43,7 +43,7 @@ object ColorMatcher {
     }
 
     /** base 위에 색감을 입힌 새 비트맵 (base는 그대로). */
-    fun applied(base: Bitmap, lut: ColorLut, strength: Float): Bitmap {
+    suspend fun applied(base: Bitmap, lut: ColorLut, strength: Float): Bitmap {
         val out = base.copy(Bitmap.Config.ARGB_8888, true)
         applyInPlace(out, lut, strength)
         return out
@@ -53,7 +53,7 @@ object ColorMatcher {
      * 원본 해상도 그대로 색감을 입혀 갤러리에 새 파일로 저장한다 (원본은 그대로 둔다).
      * @return 저장된 사진 주소
      */
-    fun saveColored(context: Context, shot: Uri, lut: ColorLut, strength: Float): Uri {
+    suspend fun saveColored(context: Context, shot: Uri, lut: ColorLut, strength: Float): Uri {
         val full = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, shot)) { decoder, _, _ ->
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             decoder.isMutableRequired = true
@@ -84,14 +84,17 @@ object ColorMatcher {
         }
     }
 
-    /** 픽셀을 한 번에 읽어 CPU 코어 수만큼 나눠 동시에 바꾼 뒤 한 번에 쓴다. */
-    private fun applyInPlace(bitmap: Bitmap, lut: ColorLut, strength: Float) {
+    /**
+     * 픽셀을 한 번에 읽어 CPU 코어 수만큼 나눠 동시에 바꾼 뒤 한 번에 쓴다.
+     * runBlocking을 쓰지 않아 백그라운드 스레드를 붙잡지 않는다 (미리보기가 겹쳐도 스레드가 바닥나지 않게).
+     */
+    private suspend fun applyInPlace(bitmap: Bitmap, lut: ColorLut, strength: Float) {
         val px = pixels(bitmap)
         val workers = Runtime.getRuntime().availableProcessors().coerceIn(1, MAX_WORKERS)
         val chunk = (px.size + workers - 1) / workers
-        runBlocking(Dispatchers.Default) {
+        coroutineScope {
             (0 until workers).map { w ->
-                launch { lut.applyInPlace(px, strength, w * chunk, minOf(px.size, (w + 1) * chunk)) }
+                launch(Dispatchers.Default) { lut.applyInPlace(px, strength, w * chunk, minOf(px.size, (w + 1) * chunk)) }
             }.joinAll()
         }
         bitmap.setPixels(px, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)

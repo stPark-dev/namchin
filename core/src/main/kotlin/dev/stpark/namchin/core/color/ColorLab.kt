@@ -33,17 +33,32 @@ object ColorLab {
 
     /** @param alpha 결과에 그대로 붙일 투명도 (0..255) */
     fun toArgb(lab: DoubleArray, alpha: Int = 0xFF): Int {
-        val fy = (lab[0] + 16) / 116
-        val fx = fy + lab[1] / 500
-        val fz = fy - lab[2] / 200
+        val (r, g, b) = linearRgb(lab[0], lab[1], lab[2])
+        return (alpha shl 24) or (gamma(r) shl 16) or (gamma(g) shl 8) or gamma(b)
+    }
+
+    /** 이 Lab 색을 잘림 없이 sRGB로 나타낼 수 있는지. */
+    fun inGamut(l: Double, a: Double, b: Double): Boolean {
+        val (r, g, bl) = linearRgb(l, a, b)
+        return r in -GAMUT_SLACK..1 + GAMUT_SLACK && g in -GAMUT_SLACK..1 + GAMUT_SLACK && bl in -GAMUT_SLACK..1 + GAMUT_SLACK
+    }
+
+    private fun linearRgb(l: Double, a: Double, b: Double): Triple<Double, Double, Double> {
+        val fy = (l + 16) / 116
+        val fx = fy + a / 500
+        val fz = fy - b / 200
         val x = fInv(fx) * XN
         val y = fInv(fy) * YN
         val z = fInv(fz) * ZN
-        val r = 3.2404542 * x - 1.5371385 * y - 0.4985314 * z
-        val g = -0.9692660 * x + 1.8760108 * y + 0.0415560 * z
-        val b = 0.0556434 * x - 0.2040259 * y + 1.0572252 * z
-        return (alpha shl 24) or (gamma(r) shl 16) or (gamma(g) shl 8) or gamma(b)
+        return Triple(
+            3.2404542 * x - 1.5371385 * y - 0.4985314 * z,
+            -0.9692660 * x + 1.8760108 * y + 0.0415560 * z,
+            0.0556434 * x - 0.2040259 * y + 1.0572252 * z,
+        )
     }
+
+    /** 8비트 색에서 온 Lab도 계산 오차로 범위를 아주 조금 넘을 수 있어 둔 여유 */
+    private const val GAMUT_SLACK = 1e-4
 
     private fun f(t: Double) = if (t > EPS) cbrt(t) else (KAPPA * t + 16) / 116
 

@@ -14,7 +14,9 @@ import dev.stpark.namchin.core.color.ColorLut
 import dev.stpark.namchin.image.BitmapLoader
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,21 +47,27 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private var colorJob: Job? = null
     private var saveJob: Job? = null
 
-    /** 사진·밝기 유지 여부별 색 변환표와 미리보기 바탕 (같은 사진에서 슬라이더만 움직이면 다시 만들지 않음) */
-    private val luts = mutableMapOf<Pair<String, Boolean>, ColorLut>()
-    private val previewBases = mutableMapOf<String, Bitmap>()
+    /**
+     * 사진·밝기 유지 여부별 색 변환표와 미리보기 바탕 (같은 사진에서 슬라이더만 움직이면 다시 만들지 않음).
+     * 메인 스레드에서만 만지고, 무거운 계산은 Deferred로 백그라운드에서 한 번만 한다 (미리보기와 저장이 공유).
+     */
+    private val luts = mutableMapOf<Pair<String, Boolean>, Deferred<ColorLut>>()
+    private val previewBases = mutableMapOf<String, Deferred<Bitmap>>()
 
-    /** 선택한 사진에 레퍼런스 색감을 입힌 미리보기. 연달아 불리면 마지막 요청만 처리한다. */
+    /** 선택한 사진에 레퍼런스 색감을 입힌 미리보기. 연달아 불리면 마지막 요청만 반영한다. */
     fun previewColor(shotId: String, strength: Float, keepLightness: Boolean) {
         val reference = (_state.value as? ReviewState.Ready)?.reference ?: return
         colorJob?.cancel()
-        colorJob = viewModelScope.launch(Dispatchers.Default) {
+        colorJob = viewModelScope.launch {
             try {
-                val app = getApplication<Application>()
                 val lut = lut(reference, shotId, keepLightness)
-                val base = previewBases.getOrPut(shotId) { BitmapLoader.load(app, Uri.parse(shotId), PREVIEW_DIMENSION) }
+                val base = cached(previewBases, shotId) {
+                    BitmapLoader.load(getApplication(), Uri.parse(shotId), PREVIEW_DIMENSION)
+                }
+                val bitmap = withContext(Dispatchers.Default) { ColorMatcher.applied(base, lut, strength) }
+                // 메인으로 돌아온 뒤 확인하므로, 그사이 새 요청이 왔다면 옛 결과는 버려진다
                 ensureActive()
-                _color.value = ColorPreview(shotId, strength, keepLightness, ColorMatcher.applied(base, lut, strength))
+                _color.value = ColorPreview(shotId, strength, keepLightness, bitmap)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -78,21 +86,33 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
         val reference = (_state.value as? ReviewState.Ready)?.reference ?: return
         if (saveJob?.isActive == true) return
         saveJob = viewModelScope.launch {
-            val ok = withContext(Dispatchers.Default + NonCancellable) {
-                runCatching {
-                    val app = getApplication<Application>()
-                    val lut = lut(reference, shotId, keepLightness)
-                    ColorMatcher.saveColored(app, Uri.parse(shotId), lut, strength)
-                }.onFailure { Log.w(TAG, "색감 저장 실패", it) }.isSuccess
-            }
+            val ok = runCatching {
+                val lut = lut(reference, shotId, keepLightness)
+                withContext(Dispatchers.Default + NonCancellable) {
+                    ColorMatcher.saveColored(getApplication(), Uri.parse(shotId), lut, strength)
+                }
+            }.onFailure { if (it is CancellationException) throw it else Log.w(TAG, "색감 저장 실패", it) }.isSuccess
             onDone(ok)
         }
     }
 
-    private fun lut(reference: Reference, shotId: String, keepLightness: Boolean): ColorLut =
-        luts.getOrPut(shotId to keepLightness) {
+    private suspend fun lut(reference: Reference, shotId: String, keepLightness: Boolean): ColorLut =
+        cached(luts, shotId to keepLightness) {
             ColorMatcher.lut(getApplication(), reference, Uri.parse(shotId), keepLightness)
         }
+
+    /** 메인에서 캐시를 찾고, 없으면 백그라운드 계산을 하나만 띄워 공유한다. 실패한 계산은 캐시에서 뺀다. */
+    private suspend fun <K, V> cached(cache: MutableMap<K, Deferred<V>>, key: K, compute: () -> V): V {
+        val deferred = cache.getOrPut(key) { viewModelScope.async(Dispatchers.Default) { compute() } }
+        return try {
+            deferred.await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (cache[key] === deferred) cache.remove(key)
+            throw e
+        }
+    }
 
     private fun clearColorCache() {
         clearColor()
