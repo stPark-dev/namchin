@@ -14,7 +14,7 @@ data class ShotCandidate(
 
 data class RankedShot(val candidate: ShotCandidate, val score: Float)
 
-/** 연사 묶음에서 베스트 컷 순위를 매긴다. 눈 감은 컷은 제외. */
+/** 연사 묶음에서 베스트 컷 순위를 매긴다. 눈 감은 컷은 제외하되, 전부 감았으면 모두 순위에 넣는다. */
 object BestShotScorer {
     const val EYES_CLOSED_THRESHOLD = 0.3f
     const val NEUTRAL_EYES = 0.5f
@@ -24,8 +24,8 @@ object BestShotScorer {
 
     fun rank(shots: List<ShotCandidate>): List<RankedShot> {
         val maxSharpness = shots.maxOfOrNull { it.sharpness } ?: return emptyList()
-        return shots
-            .filter { (it.eyesOpen ?: NEUTRAL_EYES) >= EYES_CLOSED_THRESHOLD }
+        val eyesOpen = shots.filter { (it.eyesOpen ?: NEUTRAL_EYES) >= EYES_CLOSED_THRESHOLD }
+        return eyesOpen.ifEmpty { shots }
             .map { RankedShot(it, scoreOf(it, maxSharpness)) }
             .sortedByDescending { it.score }
     }

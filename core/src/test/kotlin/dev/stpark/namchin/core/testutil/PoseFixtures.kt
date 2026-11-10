@@ -22,8 +22,8 @@ val STANDING: Map<Joint, Point> = mapOf(
     Joint.RIGHT_ANKLE to Point(0.47f, 0.85f),
 )
 
-fun pose(points: Map<Joint, Point>, confidence: Float = 0.9f): PersonPose =
-    PersonPose(points.mapValues { (joint, p) -> Keypoint(joint, p, confidence) })
+fun pose(points: Map<Joint, Point>, confidence: Float = 0.9f, aspectRatio: Float = 1f): PersonPose =
+    PersonPose(points.mapValues { (joint, p) -> Keypoint(joint, p, confidence) }, aspectRatio)
 
 fun Map<Joint, Point>.with(vararg overrides: Pair<Joint, Point>): Map<Joint, Point> =
     this + overrides
@@ -37,4 +37,8 @@ fun Map<Joint, Point>.mirrored(): Map<Joint, Point> =
     entries.associate { (joint, p) -> joint.opposite() to Point(1f - p.x, p.y) }
 
 fun PersonPose.withConfidence(joint: Joint, confidence: Float): PersonPose =
-    PersonPose(keypoints + (joint to keypoints.getValue(joint).copy(confidence = confidence)))
+    copy(keypoints = keypoints + (joint to keypoints.getValue(joint).copy(confidence = confidence)))
+
+/** 정사각 기준 좌표를 가로/세로 비율 aspect(w/h)인 이미지의 정규화 좌표로 옮긴다. */
+fun Map<Joint, Point>.inAspect(aspect: Float): Map<Joint, Point> =
+    mapValues { (_, p) -> Point(0.5f + (p.x - 0.5f) / aspect, p.y) }

@@ -1,6 +1,6 @@
 package dev.stpark.namchin.core.crop
 
-/** 축소된 흑백(휘도 0..255) 이미지. */
+/** 축소된 흑백(휘도 0..255) 이미지. 원본과 가로세로 비율이 같아야 한다. */
 class LumaImage(val width: Int, val height: Int, val data: IntArray) {
     init {
         require(data.size == width * height) { "data 크기(${data.size})가 ${width}x$height 와 다름" }
@@ -15,6 +15,7 @@ data class CropRect(val left: Int, val top: Int, val right: Int, val bottom: Int
 /**
  * 인스타 캡처에서 사진 영역을 찾는다.
  * 앱 UI는 흰색(라이트) 또는 검은색(다크) 배경이 대부분인 줄이라는 점을 이용한다.
+ * 잘라낸 영역이 인스타 비율이 아니면(밤하늘 등 어두운 띠에 잘린 경우) null → 수동 크롭.
  */
 object ScreenshotCropDetector {
     const val UI_RATIO = 0.7f
@@ -22,6 +23,10 @@ object ScreenshotCropDetector {
     const val NEAR_BLACK = 10
     const val MIN_SIZE_RATIO = 0.2f
     const val GAP_TOLERANCE_RATIO = 0.02f
+    const val RATIO_TOLERANCE = 0.04f
+
+    /** 인스타 게시물/스토리 비율 (가로/세로): 1:1, 4:5, 3:4, 1.91:1, 9:16. */
+    val INSTAGRAM_RATIOS = listOf(1f, 4f / 5f, 3f / 4f, 1.91f, 9f / 16f)
 
     fun detect(image: LumaImage): CropRect? {
         val rowIsPhoto = BooleanArray(image.height) { y ->
@@ -36,8 +41,13 @@ object ScreenshotCropDetector {
         val cols = longestRun(colIsPhoto, gapFor(image.width)) ?: return null
         if (cols.count() < image.width * MIN_SIZE_RATIO) return null
 
-        return CropRect(cols.first, rows.first, cols.last + 1, rows.last + 1)
+        val rect = CropRect(cols.first, rows.first, cols.last + 1, rows.last + 1)
+        val isWholeImage = rows.count() == image.height && cols.count() == image.width
+        return rect.takeIf { isWholeImage || isInstagramRatio(cols.count().toFloat() / rows.count()) }
     }
+
+    private fun isInstagramRatio(ratio: Float): Boolean =
+        INSTAGRAM_RATIOS.any { kotlin.math.abs(ratio / it - 1f) <= RATIO_TOLERANCE }
 
     private fun isUi(line: IntArray): Boolean {
         val white = line.count { it >= NEAR_WHITE }

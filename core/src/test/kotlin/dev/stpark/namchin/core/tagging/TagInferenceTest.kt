@@ -29,12 +29,21 @@ class TagInferenceTest {
     }
 
     @Test
-    fun `similar confirmed examples override base labels`() {
+    fun `neighbour votes are combined with mapped base labels`() {
         val examples = listOf(TaggedExample(emb(1f, 0.1f), setOf(autumn)))
 
         val tags = TagInference.suggest(emb(1f, 0f), examples, setOf("Coffee"), mapping)
 
-        assertEquals(setOf(autumn), tags)
+        assertEquals(setOf(autumn, cafe), tags)
+    }
+
+    @Test
+    fun `examples from a different embedding model are skipped`() {
+        val stale = listOf(TaggedExample(emb(1f, 0f, 0f), setOf(autumn)))
+
+        val tags = TagInference.suggest(emb(1f, 0f), stale, setOf("Night"), mapping)
+
+        assertEquals(setOf(night), tags)
     }
 
     @Test

@@ -34,11 +34,11 @@ namchin/
 
 ### Phase 1. 핵심 로직 (core, TDD)
 테스트 먼저 → 구현 순서:
-1. `PoseNormalizer` — 골반 중심 이동, 몸통 길이로 스케일 정규화
-2. `PoseSimilarity` — 관절 각도 기반 점수, 원본/반전 중 높은 값, 가장 어긋난 부위 반환, 저신뢰도 관절 제외
-3. `FramingAnalyzer` — 레퍼런스 vs 현재 (bbox 크기·위치, 머리/발끝 위치, 수평각) → 안내 큐
-4. `GuidancePrioritizer` — 수평 → 거리 → 높이 → 좌우 → 포즈, 한 번에 1개, 같은 문구 쿨다운
-5. `AutoShutterStateMachine` — IDLE → ALIGNING → FIRING → COOLDOWN, 0.5초 유지 조건, 야경 시 비활성
+1. ~~`PoseNormalizer`~~ — 제외: 마디 각도 비교가 이미 거리·위치 불변
+2. `PoseSimilarity` — 마디 각도(이미지 비율 보정) 점수, 반전은 0.05 이상 나을 때만 전환, 현재 안 보이는 마디는 0점
+3. `FramingAnalyzer` — 몸통(어깨 중점·몸통 길이) 기준 위치·크기 + 수평각 → 안내 큐, 히스테리시스
+4. `GuidancePrioritizer` — 인물없음 → 수평 → 거리 → 기울기 → 좌우 → 포즈, 400ms 안정 후 발화, 쿨다운
+5. `AutoShutter` — 0.5초 유지 시 발사, 150ms 끊김 허용, 쿨다운 후 포즈가 한 번 풀려야 재발사, 수동 촬영 시 쿨다운
 6. `TagInference` — kNN 투표 + ML Kit 라벨 매핑, 확정 예시 0개일 때 기본 라벨만
 7. `ScreenshotCropDetector` — 인스타 UI 단색 띠를 걸러 사진 사각형 검출, 실패 시 null
 8. `BestShotScorer` — 일치도 + 눈 뜸 확률 + 선명도
@@ -71,6 +71,12 @@ namchin/
 ### Phase 7. 야경 처리
 - 프레임 평균 휘도로 저조도 판정 → 포즈 매칭·자동셔터 OFF, 자이로 기반 흔들림 경고
 - 검증: 어두운 곳에서 모드 전환 확인
+
+### Phase 1 리뷰 후 보류 항목
+- "폰 높이" 안내: 현재는 기울기(Tilt)로 대체. 실측 후 피치 센서 추가 여부 결정
+- 포즈 안내에 방향(올려/내려/굽혀) 포함
+- 의도적으로 기울인 레퍼런스(더치 앵글) 재현
+- Phase 3 연결 시: 실시간 좌표는 레퍼런스 비율로 자른 영역 기준으로 정규화할 것, 직전 반전 선택(`preferMirrored`)과 직전 안내(`previous`)를 다음 프레임에 넘길 것
 
 ## 주요 위험과 대응
 

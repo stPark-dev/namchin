@@ -58,4 +58,11 @@ class BestShotScorerTest {
 
         assertEquals(0.5f * 0.9f + 0.3f * 0.9f, ranked.single().score, 1e-4f)
     }
+
+    @Test
+    fun `if every shot has closed eyes they are all ranked anyway`() {
+        val ranked = BestShotScorer.rank(listOf(shot("a", eyes = 0.1f, pose = 0.5f), shot("b", eyes = 0.1f)))
+
+        assertEquals(listOf("b", "a"), ranked.map { it.candidate.id })
+    }
 }

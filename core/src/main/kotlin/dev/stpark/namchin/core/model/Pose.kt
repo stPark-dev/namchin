@@ -22,7 +22,14 @@ enum class Joint {
 
 data class Keypoint(val joint: Joint, val position: Point, val confidence: Float)
 
-data class PersonPose(val keypoints: Map<Joint, Keypoint>) {
+/**
+ * @property aspectRatio 원본 이미지의 가로/세로 비율. 정규화 좌표를 실제 비율로 되돌릴 때 쓴다.
+ */
+data class PersonPose(val keypoints: Map<Joint, Keypoint>, val aspectRatio: Float) {
+    init {
+        require(aspectRatio > 0f) { "aspectRatio must be positive: $aspectRatio" }
+    }
+
     fun reliable(joint: Joint, minConfidence: Float): Point? =
         keypoints[joint]?.takeIf { it.confidence >= minConfidence }?.position
 }

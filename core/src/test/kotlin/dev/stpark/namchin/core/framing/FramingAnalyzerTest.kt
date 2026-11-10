@@ -8,10 +8,12 @@ import org.junit.jupiter.api.Test
 
 class FramingAnalyzerTest {
 
-    private val reference = PersonFrame(top = 0.2f, bottom = 0.8f, centerX = 0.5f)
+    private val reference = PersonFrame(anchorX = 0.5f, anchorY = 0.3f, torso = 0.25f)
 
-    private fun analyze(current: PersonFrame, roll: Float = 0f) =
-        FramingAnalyzer.analyze(reference, current, rollDegrees = roll)
+    private fun frame(x: Float = 0.5f, y: Float = 0.3f, torso: Float = 0.25f) = PersonFrame(x, y, torso)
+
+    private fun analyze(current: PersonFrame, roll: Float = 0f, previous: List<Guidance> = emptyList()) =
+        FramingAnalyzer.analyze(reference, current, rollDegrees = roll, previous = previous)
 
     @Test
     fun `matching frame and level phone gives no cues`() {
@@ -20,9 +22,7 @@ class FramingAnalyzerTest {
 
     @Test
     fun `small differences within tolerance give no cues`() {
-        val close = PersonFrame(top = 0.21f, bottom = 0.82f, centerX = 0.52f)
-
-        assertTrue(analyze(close, roll = 2f).isEmpty())
+        assertTrue(analyze(frame(x = 0.53f, y = 0.27f, torso = 0.26f), roll = 2f).isEmpty())
     }
 
     @Test
@@ -32,56 +32,50 @@ class FramingAnalyzerTest {
     }
 
     @Test
-    fun `person too big asks to move back`() {
-        val big = PersonFrame(top = 0.05f, bottom = 0.95f, centerX = 0.5f)
-
-        assertEquals(listOf(Guidance.MoveBack), analyze(big))
+    fun `person too big asks to move back, too small to move closer`() {
+        assertEquals(listOf(Guidance.MoveBack), analyze(frame(torso = 0.35f)))
+        assertEquals(listOf(Guidance.MoveCloser), analyze(frame(torso = 0.18f)))
     }
 
     @Test
-    fun `person too small asks to move closer`() {
-        val small = PersonFrame(top = 0.35f, bottom = 0.65f, centerX = 0.5f)
-
-        assertEquals(listOf(Guidance.MoveCloser), analyze(small))
+    fun `person too high asks to tilt up, too low to tilt down`() {
+        assertEquals(listOf(Guidance.TiltUp), analyze(frame(y = 0.2f)))
+        assertEquals(listOf(Guidance.TiltDown), analyze(frame(y = 0.4f)))
     }
 
     @Test
-    fun `person too high in frame asks to tilt up`() {
-        val high = PersonFrame(top = 0.1f, bottom = 0.7f, centerX = 0.5f)
-
-        assertEquals(listOf(Guidance.TiltUp), analyze(high))
-    }
-
-    @Test
-    fun `person too low in frame asks to tilt down`() {
-        val low = PersonFrame(top = 0.3f, bottom = 0.9f, centerX = 0.5f)
-
-        assertEquals(listOf(Guidance.TiltDown), analyze(low))
-    }
-
-    @Test
-    fun `person too far left asks to pan left`() {
-        val left = PersonFrame(top = 0.2f, bottom = 0.8f, centerX = 0.3f)
-
-        assertEquals(listOf(Guidance.PanLeft), analyze(left))
-    }
-
-    @Test
-    fun `person too far right asks to pan right`() {
-        val right = PersonFrame(top = 0.2f, bottom = 0.8f, centerX = 0.7f)
-
-        assertEquals(listOf(Guidance.PanRight), analyze(right))
+    fun `person too far left asks to pan left, too far right to pan right`() {
+        assertEquals(listOf(Guidance.PanLeft), analyze(frame(x = 0.3f)))
+        assertEquals(listOf(Guidance.PanRight), analyze(frame(x = 0.7f)))
     }
 
     @Test
     fun `multiple problems produce multiple cues`() {
-        val off = PersonFrame(top = 0.35f, bottom = 0.65f, centerX = 0.3f)
-
-        val cues = analyze(off, roll = 10f)
+        val cues = analyze(frame(x = 0.3f, torso = 0.15f), roll = 10f)
 
         assertEquals(
             setOf(Guidance.Level(Rotation.COUNTERCLOCKWISE), Guidance.MoveCloser, Guidance.PanLeft),
             cues.toSet(),
         )
+    }
+
+    @Test
+    fun `an active cue persists until well inside tolerance (hysteresis)`() {
+        val level = Guidance.Level(Rotation.COUNTERCLOCKWISE)
+
+        assertTrue(analyze(reference, roll = 2.5f).isEmpty())
+        assertEquals(listOf(level), analyze(reference, roll = 2.5f, previous = listOf(level)))
+        assertTrue(analyze(reference, roll = 1.5f, previous = listOf(level)).isEmpty())
+
+        assertEquals(listOf(Guidance.MoveBack), analyze(frame(torso = 0.27f), previous = listOf(Guidance.MoveBack)))
+        assertTrue(analyze(frame(torso = 0.27f)).isEmpty())
+
+        assertEquals(listOf(Guidance.PanLeft), analyze(frame(x = 0.46f), previous = listOf(Guidance.PanLeft)))
+        assertTrue(analyze(frame(x = 0.46f)).isEmpty())
+    }
+
+    @Test
+    fun `hysteresis only applies to the same direction`() {
+        assertTrue(analyze(frame(x = 0.46f), previous = listOf(Guidance.PanRight)).isEmpty())
     }
 }

@@ -25,8 +25,9 @@ class Embedding(val values: FloatArray) {
 class TaggedExample(val embedding: Embedding, val tags: Set<Tag>)
 
 /**
- * 학습 없는 개인화: 확정된 비슷한 레퍼런스들의 태그를 유사도 가중 투표로 제안한다.
- * 비슷한 예시가 없으면 기기 내 기본 라벨을 매핑해서 쓴다.
+ * 학습 없는 개인화: 확정된 비슷한 레퍼런스들의 태그를 유사도 가중 투표로 고르고,
+ * 기기 내 기본 라벨을 매핑한 태그와 합쳐 제안한다.
+ * 차원이 다른 임베딩(임베딩 모델 교체 전 데이터)은 건너뛴다.
  */
 object TagInference {
     const val K = 5
@@ -39,18 +40,20 @@ object TagInference {
         baseLabels: Set<String>,
         labelMapping: Map<String, Tag>,
     ): Set<Tag> {
+        val baseTags = baseLabels.mapNotNull { labelMapping[it] }.toSet()
         val neighbours = examples
+            .filter { it.embedding.values.size == query.values.size }
             .map { it to query.cosine(it.embedding) }
             .filter { (_, sim) -> sim >= MIN_SIMILARITY }
             .sortedByDescending { (_, sim) -> sim }
             .take(K)
-        if (neighbours.isEmpty()) return baseLabels.mapNotNull { labelMapping[it] }.toSet()
+        if (neighbours.isEmpty()) return baseTags
 
         val totalWeight = neighbours.sumOf { (_, sim) -> sim.toDouble() }
         return neighbours
             .flatMap { (example, sim) -> example.tags.map { it to sim } }
             .groupBy({ it.first }, { it.second })
             .filterValues { sims -> sims.sum() / totalWeight >= VOTE_THRESHOLD }
-            .keys
+            .keys + baseTags
     }
 }

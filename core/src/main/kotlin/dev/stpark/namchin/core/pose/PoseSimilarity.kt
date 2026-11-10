@@ -7,9 +7,9 @@ import kotlin.math.abs
 import kotlin.math.atan2
 
 /**
- * @property score 0..1, 비교 가능한 마디들의 평균 일치도
- * @property mirrored 레퍼런스를 좌우반전했을 때 더 잘 맞았는지
- * @property worstPart 현재 인물 기준으로 가장 어긋난 마디
+ * @property score 0..1, 레퍼런스에 보이는 마디 기준 평균 일치도 (현재 안 보이는 마디는 0)
+ * @property mirrored 레퍼런스를 좌우반전해서 비교했는지
+ * @property partScores 현재 인물 기준 마디별 점수
  */
 data class PoseMatch(
     val score: Float,
@@ -17,46 +17,48 @@ data class PoseMatch(
     val partScores: Map<BodyPart, Float>,
 ) {
     val worstPart: BodyPart? = partScores.minByOrNull { it.value }?.key
+    val minPartScore: Float = partScores.values.minOrNull() ?: 0f
 }
 
 /**
  * 마디 방향(각도)만 비교하므로 촬영 거리·인물 위치와 무관하다.
- * 레퍼런스를 거울 반전한 버전과도 비교해 더 높은 쪽을 택한다.
+ * 각도는 이미지 비율을 보정해 계산한다.
+ * 레퍼런스를 거울 반전한 버전과도 비교하되, 이전 선택을 MIRROR_MARGIN 이상 이겨야 바꾼다.
  */
 object PoseSimilarity {
     const val MIN_CONFIDENCE = 0.5f
     const val MIN_PARTS = 4
+    const val MIRROR_MARGIN = 0.05f
 
     /** 이 각도 이상 어긋나면 해당 마디 점수 0. */
     private const val MAX_ANGLE_DIFF = PI / 2
 
-    fun compare(reference: PersonPose, current: PersonPose): PoseMatch? {
-        val direct = partScores(reference, current, mirrored = false)
-        val mirrored = partScores(reference, current, mirrored = true)
-        val best = listOf(direct to false, mirrored to true)
-            .filter { (scores, _) -> scores.size >= MIN_PARTS }
-            .maxByOrNull { (scores, _) -> scores.values.average() }
-            ?: return null
-        val (scores, isMirrored) = best
-        return PoseMatch(scores.values.average().toFloat(), isMirrored, scores)
+    /** 레퍼런스가 포즈 비교에 쓸 만한지. false면 포즈 매칭을 끄고 구도만 본다. */
+    fun isComparable(reference: PersonPose): Boolean =
+        BodyPart.entries.count { angleOf(reference, it, flip = false) != null } >= MIN_PARTS
+
+    fun compare(reference: PersonPose, current: PersonPose, preferMirrored: Boolean = false): PoseMatch? {
+        if (!isComparable(reference)) return null
+        val preferred = match(reference, current, mirrored = preferMirrored)
+        val alternative = match(reference, current, mirrored = !preferMirrored)
+        return if (alternative.score > preferred.score + MIRROR_MARGIN) alternative else preferred
     }
 
-    private fun partScores(
-        reference: PersonPose,
-        current: PersonPose,
-        mirrored: Boolean,
-    ): Map<BodyPart, Float> = BodyPart.entries.mapNotNull { part ->
-        val currentAngle = angleOf(current, part, flip = false) ?: return@mapNotNull null
-        val refPart = if (mirrored) part.opposite() else part
-        val refAngle = angleOf(reference, refPart, flip = mirrored) ?: return@mapNotNull null
-        part to scoreFor(angleDiff(currentAngle, refAngle))
-    }.toMap()
+    private fun match(reference: PersonPose, current: PersonPose, mirrored: Boolean): PoseMatch {
+        val scores = BodyPart.entries.mapNotNull { part ->
+            val refPart = if (mirrored) part.opposite() else part
+            val refAngle = angleOf(reference, refPart, flip = mirrored) ?: return@mapNotNull null
+            val currentAngle = angleOf(current, part, flip = false)
+            part to (currentAngle?.let { scoreFor(angleDiff(it, refAngle)) } ?: 0f)
+        }.toMap()
+        return PoseMatch(scores.values.average().toFloat(), mirrored, scores)
+    }
 
     private fun angleOf(pose: PersonPose, part: BodyPart, flip: Boolean): Double? {
         val from = pose.reliable(part.from, MIN_CONFIDENCE) ?: return null
         val to = pose.reliable(part.to, MIN_CONFIDENCE) ?: return null
-        val dx = (to.x - from.x).toDouble().let { if (flip) -it else it }
-        return atan2((to.y - from.y).toDouble(), dx)
+        val dx = (to.x - from.x).toDouble() * pose.aspectRatio
+        return atan2((to.y - from.y).toDouble(), if (flip) -dx else dx)
     }
 
     private fun angleDiff(a: Double, b: Double): Double {

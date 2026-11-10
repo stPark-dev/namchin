@@ -10,11 +10,15 @@ import org.junit.jupiter.api.Test
 
 class AlignmentTest {
 
-    private fun match(score: Float, worst: BodyPart = BodyPart.LEFT_FOREARM) =
-        PoseMatch(score, mirrored = false, partScores = mapOf(worst to score, BodyPart.LEFT_THIGH to 1f))
+    /** 평균 avg, 가장 나쁜 마디(LEFT_FOREARM) 점수 worst인 매치. */
+    private fun match(avg: Float, worst: Float = avg) = PoseMatch(
+        score = avg,
+        mirrored = false,
+        partScores = mapOf(BodyPart.LEFT_FOREARM to worst, BodyPart.LEFT_THIGH to 1f),
+    )
 
     @Test
-    fun `aligned when framing has no cues and pose is above threshold`() {
+    fun `aligned when framing is fine and every part is close enough`() {
         val result = Alignment.evaluate(emptyList(), match(0.9f), poseEnabled = true)
 
         assertTrue(result.aligned)
@@ -30,6 +34,14 @@ class AlignmentTest {
     }
 
     @Test
+    fun `one badly wrong limb blocks alignment even with a high average`() {
+        val result = Alignment.evaluate(emptyList(), match(avg = 0.85f, worst = 0f), poseEnabled = true)
+
+        assertFalse(result.aligned)
+        assertEquals(listOf(Guidance.Pose(BodyPart.LEFT_FOREARM)), result.cues)
+    }
+
+    @Test
     fun `framing cues block alignment even with a good pose`() {
         val result = Alignment.evaluate(listOf(Guidance.MoveBack), match(0.95f), poseEnabled = true)
 
@@ -38,10 +50,18 @@ class AlignmentTest {
     }
 
     @Test
-    fun `unknown pose is never aligned`() {
-        val result = Alignment.evaluate(emptyList(), null, poseEnabled = true)
+    fun `undetected person asks to get the person in frame`() {
+        val result = Alignment.evaluate(null, null, poseEnabled = true)
 
         assertFalse(result.aligned)
+        assertEquals(listOf(Guidance.NoPerson), result.cues)
+    }
+
+    @Test
+    fun `without a comparable pose only framing matters`() {
+        val result = Alignment.evaluate(emptyList(), null, poseEnabled = true)
+
+        assertTrue(result.aligned)
         assertTrue(result.cues.isEmpty())
     }
 
