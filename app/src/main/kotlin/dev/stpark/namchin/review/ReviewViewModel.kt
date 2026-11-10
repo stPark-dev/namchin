@@ -25,54 +25,60 @@ sealed interface ReviewState {
     data class Ready(val items: List<ReviewItem>, val reference: Reference?) : ReviewState
 }
 
-/** 연속 촬영 결과에서 베스트 컷을 고르고, 원하면 나머지를 갤러리에서 지운다. */
+/** 연속 촬영 결과에서 베스트 컷을 고르고, 원하면 고른 한 장만 남기고 나머지를 갤러리에서 지운다. */
 class ReviewViewModel(app: Application) : AndroidViewModel(app) {
-    private val analyzer by lazy { ShotAnalyzer(app) }
-    private var analyzerCreated = false
     private val _state = MutableStateFlow<ReviewState>(ReviewState.Hidden)
     val state: StateFlow<ReviewState> = _state.asStateFlow()
     private var job: Job? = null
+    private var deleteJob: Job? = null
 
     fun review(uris: List<Uri>, reference: Reference?) {
         job?.cancel()
         _state.value = ReviewState.Analyzing
         job = viewModelScope.launch {
-            _state.value = try {
-                analyzerCreated = true
-                val shots = uris.map { analyzer.analyze(it, reference?.pose) }
-                ReviewState.Ready(ShotReview.of(shots), reference)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "베스트 컷 분석 실패", e)
-                // 분석이 실패해도 사진은 보여준다 (점수·표시 없이)
-                ReviewState.Ready(uris.mapIndexed { i, u -> ReviewItem(u.toString(), null, i == 0, false) }, reference)
+            // 분석 모델은 이번 결과 화면 동안만 메모리에 둔다
+            val analyzed = ShotAnalyzer(getApplication()).use { analyzer ->
+                uris.mapNotNull { uri ->
+                    try {
+                        analyzer.analyze(uri, reference?.pose)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // 한 장이 실패해도 나머지는 분석한다. 실패한 장은 베스트 후보에서 빠진다
+                        Log.w(TAG, "분석 실패: $uri", e)
+                        null
+                    }
+                }
             }
+            _state.value = ReviewState.Ready(ShotReview.merge(uris.map { it.toString() }, analyzed), reference)
         }
     }
 
-    /** 베스트를 뺀 나머지를 갤러리에서 지운다 (앱이 만든 사진이라 권한 없이 가능). */
-    fun keepBestOnly(onDone: () -> Unit) {
+    /**
+     * keepId 한 장만 남기고 나머지를 갤러리에서 지운다 (앱이 만든 사진이라 권한 없이 가능).
+     * 화면은 바로 닫고, 끝나면 지우지 못한 장 수를 알린다.
+     */
+    fun keepOnly(keepId: String, onDone: (failed: Int) -> Unit) {
         val ready = _state.value as? ReviewState.Ready ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                ready.items.filterNot { it.best }.forEach { item ->
-                    runCatching { getApplication<Application>().contentResolver.delete(Uri.parse(item.id), null, null) }
-                        .onFailure { Log.w(TAG, "삭제 실패: ${item.id}", it) }
+        if (deleteJob?.isActive == true) return
+        _state.value = ReviewState.Hidden
+        val targets = ready.items.map { it.id }.filter { it != keepId }
+        deleteJob = viewModelScope.launch {
+            val failed = withContext(Dispatchers.IO) {
+                targets.count { id ->
+                    val deleted = runCatching {
+                        getApplication<Application>().contentResolver.delete(Uri.parse(id), null, null)
+                    }.onFailure { Log.w(TAG, "삭제 실패: $id", it) }.getOrDefault(0)
+                    deleted != 1
                 }
             }
-            _state.value = ReviewState.Hidden
-            onDone()
+            onDone(failed)
         }
     }
 
     fun close() {
         job?.cancel()
         _state.value = ReviewState.Hidden
-    }
-
-    override fun onCleared() {
-        if (analyzerCreated) analyzer.close()
     }
 
     private companion object {

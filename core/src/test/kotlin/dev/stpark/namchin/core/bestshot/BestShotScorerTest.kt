@@ -65,4 +65,11 @@ class BestShotScorerTest {
 
         assertEquals(listOf("b", "a"), ranked.map { it.candidate.id })
     }
+
+    @Test
+    fun `a shot without a face loses to an open-eyed face from the same burst`() {
+        val ranked = BestShotScorer.rank(listOf(shot("noFace", eyes = null), shot("face", eyes = 0.45f)))
+
+        assertEquals("face", ranked.first().candidate.id)
+    }
 }

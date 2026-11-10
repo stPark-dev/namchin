@@ -191,6 +191,7 @@ private fun CameraContent(
 
     val canShoot = ShutterGate.canShoot(referenceId, reference?.id, imageCapture != null, capturing)
     fun shoot(count: Int) {
+        if (reviewing) return
         val capture = imageCapture ?: return
         if (!ShutterGate.canShoot(referenceId, reference?.id, true, capturing)) return
         // 저장되는 사진도 화면의 밝은 영역(레퍼런스 비율)과 같게 자른다. 비율은 촬영 시점에 읽힌다
@@ -314,7 +315,7 @@ private fun CameraContent(
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 ShutterBar(
                     latestReference = all.firstOrNull(),
-                    enabled = canShoot,
+                    enabled = canShoot && !reviewing,
                     onShutter = { shoot(1) },
                     onLongShutter = { shoot(BURST_COUNT) },
                     onOpenLibrary = onOpenLibrary,
@@ -343,7 +344,11 @@ private fun CameraContent(
         }
         ResultOverlay(
             state = review,
-            onKeepBest = { reviewVm.keepBestOnly { message = R.string.review_kept_best } },
+            onKeep = { id ->
+                reviewVm.keepOnly(id) { failed ->
+                    message = if (failed == 0) R.string.review_kept else R.string.review_keep_failed
+                }
+            },
             onClose = reviewVm::close,
         )
         if (deckOpen) {

@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,14 +56,18 @@ private val SHAPE = RoundedCornerShape(14.dp)
 
 /** 연속 촬영 결과: 베스트 컷 크게, 레퍼런스와 나란히 비교, 아래 줄에서 다른 컷 보기. */
 @Composable
-fun ResultOverlay(state: ReviewState, onKeepBest: () -> Unit, onClose: () -> Unit) {
+fun ResultOverlay(state: ReviewState, onKeep: (String) -> Unit, onClose: () -> Unit) {
     if (state == ReviewState.Hidden) return
     Box(
         Modifier
             .fillMaxSize()
             .background(Brand.Ink)
-            // 아래 카메라로 터치가 새지 않게
-            .clickable(enabled = false) {}
+            // 아래 카메라(셔터·줌)로 터치가 새지 않게 남은 이벤트를 모두 소비
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                }
+            }
             .safeDrawingPadding(),
     ) {
         when (state) {
@@ -74,15 +79,15 @@ fun ResultOverlay(state: ReviewState, onKeepBest: () -> Unit, onClose: () -> Uni
                 CircularProgressIndicator(color = Brand.Yellow)
                 Text(stringResource(R.string.review_analyzing), color = Color.White)
             }
-            is ReviewState.Ready -> ReadyContent(state, onKeepBest, onClose)
+            is ReviewState.Ready -> ReadyContent(state, onKeep, onClose)
             ReviewState.Hidden -> Unit
         }
     }
 }
 
 @Composable
-private fun ReadyContent(state: ReviewState.Ready, onKeepBest: () -> Unit, onClose: () -> Unit) {
-    var selectedId by remember(state) { mutableStateOf(state.items.firstOrNull { it.best }?.id) }
+private fun ReadyContent(state: ReviewState.Ready, onKeep: (String) -> Unit, onClose: () -> Unit) {
+    var selectedId by remember(state) { mutableStateOf((state.items.firstOrNull { it.best } ?: state.items.firstOrNull())?.id) }
     var compare by remember(state) { mutableStateOf(state.reference != null) }
     val selected = state.items.firstOrNull { it.id == selectedId } ?: state.items.firstOrNull() ?: return
     val reference = state.reference
@@ -131,12 +136,16 @@ private fun ReadyContent(state: ReviewState.Ready, onKeepBest: () -> Unit, onClo
             OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f).height(52.dp)) {
                 Text(stringResource(R.string.review_keep_all), color = Color.White)
             }
+            // 보고 있는 사진을 남긴다. 베스트가 아닌 걸 골랐으면 문구로 분명히
             Button(
-                onClick = onKeepBest,
+                onClick = { onKeep(selected.id) },
                 colors = ButtonDefaults.buttonColors(containerColor = Brand.Yellow, contentColor = Brand.Ink),
                 modifier = Modifier.weight(1f).height(52.dp),
             ) {
-                Text(stringResource(R.string.review_keep_best), fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(if (selected.best) R.string.review_keep_best else R.string.review_keep_selected),
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

@@ -24,16 +24,18 @@ object BestShotScorer {
 
     fun rank(shots: List<ShotCandidate>): List<RankedShot> {
         val maxSharpness = shots.maxOfOrNull { it.sharpness } ?: return emptyList()
+        // 같은 연사에서 다른 컷엔 얼굴이 잡혔다면, 얼굴을 못 찾은 컷은 나쁜 컷(고개 돌림·흔들림)으로 본다
+        val missingFace = if (shots.any { it.eyesOpen != null }) 0f else NEUTRAL_EYES
         val eyesOpen = shots.filter { (it.eyesOpen ?: NEUTRAL_EYES) >= EYES_CLOSED_THRESHOLD }
         return eyesOpen.ifEmpty { shots }
-            .map { RankedShot(it, scoreOf(it, maxSharpness)) }
+            .map { RankedShot(it, scoreOf(it, maxSharpness, missingFace)) }
             .sortedByDescending { it.score }
     }
 
-    private fun scoreOf(shot: ShotCandidate, maxSharpness: Float): Float {
+    private fun scoreOf(shot: ShotCandidate, maxSharpness: Float, missingFace: Float): Float {
         val sharpness = if (maxSharpness > 0f) shot.sharpness / maxSharpness else 0f
         return POSE_WEIGHT * (shot.poseScore ?: 0f) +
-            EYES_WEIGHT * (shot.eyesOpen ?: NEUTRAL_EYES) +
+            EYES_WEIGHT * (shot.eyesOpen ?: missingFace) +
             SHARPNESS_WEIGHT * sharpness
     }
 }

@@ -21,4 +21,13 @@ object ShotReview {
             )
         }
     }
+
+    /**
+     * 분석에 실패한 컷도 찍은 순서 자리에 두되, 점수·베스트 후보에서는 뺀다.
+     * 전부 실패했으면 베스트가 없다 (근거 없이 지우지 않게).
+     */
+    fun merge(ids: List<String>, analyzed: List<ShotCandidate>): List<ReviewItem> {
+        val reviewed = of(analyzed).associateBy { it.id }
+        return ids.map { id -> reviewed[id] ?: ReviewItem(id, score = null, best = false, eyesClosed = false) }
+    }
 }

@@ -97,4 +97,13 @@ class AutoShutterTest {
     fun `a manual shot starts a cooldown`() {
         assertEquals(ShutterState.Cooldown(500 + COOLDOWN_MS), AutoShutter.afterManualShot(nowMs = 500))
     }
+
+    @Test
+    fun `pausing does not forget that the pose must be released first`() {
+        val waiting = ShutterState.AwaitingRelease()
+
+        val steps = run(Frame(0, true, enabled = false), on(100), on(100 + HOLD_MS), from = waiting)
+
+        assertTrue(steps.none { it.fire })
+    }
 }

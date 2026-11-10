@@ -105,6 +105,8 @@
     <string name="review_keep_best">베스트만 남기기</string>
     <string name="review_eyes_closed">눈 감음</string>
     <string name="review_best">베스트</string>
-    <string name="review_kept_best">베스트 컷만 남겼어요</string>
+    <string name="review_keep_selected">이 사진만 남기기</string>
+    <string name="review_kept">고른 사진만 남겼어요</string>
+    <string name="review_keep_failed">일부 사진은 지우지 못했어요</string>
     <string name="review_reference">레퍼런스</string>
 </resources>

@@ -23,7 +23,11 @@ object AutoShutter {
     fun afterManualShot(nowMs: Long): ShutterState = ShutterState.Cooldown(nowMs + COOLDOWN_MS)
 
     fun step(state: ShutterState, aligned: Boolean, enabled: Boolean, nowMs: Long): ShutterStep {
-        if (!enabled) return ShutterStep(state as? ShutterState.Cooldown ?: ShutterState.Idle, fire = false)
+        // 잠시 멈춘 동안에도 쿨다운과 "포즈를 한 번 풀어야 함"은 기억한다 (재개 직후 같은 포즈로 다시 찍지 않게)
+        if (!enabled) {
+            val kept = state.takeIf { it is ShutterState.Cooldown || it is ShutterState.AwaitingRelease }
+            return ShutterStep(kept ?: ShutterState.Idle, fire = false)
+        }
         val next = when (state) {
             ShutterState.Idle ->
                 if (aligned) ShutterState.Aligning(nowMs, nowMs) else state

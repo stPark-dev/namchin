@@ -39,4 +39,23 @@ class ShotReviewTest {
     fun `no shots gives no items`() {
         assertTrue(ShotReview.of(emptyList()).isEmpty())
     }
+
+    @Test
+    fun `shots that failed analysis keep their place but are never best`() {
+        val items = ShotReview.merge(
+            ids = listOf("1", "2", "3"),
+            analyzed = listOf(shot("1", pose = 0.5f), shot("3", pose = 0.9f)),
+        )
+
+        assertEquals(listOf("1", "2", "3"), items.map { it.id })
+        assertEquals(listOf(false, false, true), items.map { it.best })
+        assertNull(items[1].score)
+    }
+
+    @Test
+    fun `when every analysis failed nothing is best`() {
+        val items = ShotReview.merge(ids = listOf("1", "2"), analyzed = emptyList())
+
+        assertTrue(items.none { it.best })
+    }
 }
