@@ -5,9 +5,11 @@ import dev.stpark.namchin.core.model.Keypoint
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.model.Point
 
-/** 정면 차렷 자세. 이미지 좌표(0..1, y 아래 방향). 인물의 왼쪽 = 화면 오른쪽. */
+/** 정면 차렷 자세. 이미지 좌표(0..1, y 아래 방향). 인물의 왼쪽 = 화면 오른쪽. 발목은 화면 아래쪽(0.90). */
 val STANDING: Map<Joint, Point> = mapOf(
     Joint.NOSE to Point(0.50f, 0.20f),
+    Joint.LEFT_EAR to Point(0.53f, 0.19f),
+    Joint.RIGHT_EAR to Point(0.47f, 0.19f),
     Joint.LEFT_SHOULDER to Point(0.55f, 0.30f),
     Joint.RIGHT_SHOULDER to Point(0.45f, 0.30f),
     Joint.LEFT_ELBOW to Point(0.56f, 0.40f),
@@ -18,8 +20,8 @@ val STANDING: Map<Joint, Point> = mapOf(
     Joint.RIGHT_HIP to Point(0.47f, 0.55f),
     Joint.LEFT_KNEE to Point(0.53f, 0.70f),
     Joint.RIGHT_KNEE to Point(0.47f, 0.70f),
-    Joint.LEFT_ANKLE to Point(0.53f, 0.85f),
-    Joint.RIGHT_ANKLE to Point(0.47f, 0.85f),
+    Joint.LEFT_ANKLE to Point(0.53f, 0.90f),
+    Joint.RIGHT_ANKLE to Point(0.47f, 0.90f),
 )
 
 fun pose(points: Map<Joint, Point>, confidence: Float = 0.9f, aspectRatio: Float = 1f): PersonPose =
@@ -42,3 +44,11 @@ fun PersonPose.withConfidence(joint: Joint, confidence: Float): PersonPose =
 /** 정사각 기준 좌표를 가로/세로 비율 aspect(w/h)인 이미지의 정규화 좌표로 옮긴다. */
 fun Map<Joint, Point>.inAspect(aspect: Float): Map<Joint, Point> =
     mapValues { (_, p) -> Point(0.5f + (p.x - 0.5f) / aspect, p.y) }
+
+/** 촬영 영역 밖 관절은 신뢰도 0 — 실제 파이프라인(CropRegion.remap)과 같게. */
+fun PersonPose.inFrame(): PersonPose = copy(
+    keypoints = keypoints.mapValues { (_, k) ->
+        val inside = k.position.x in 0f..1f && k.position.y in 0f..1f
+        if (inside) k else k.copy(confidence = 0f)
+    },
+)

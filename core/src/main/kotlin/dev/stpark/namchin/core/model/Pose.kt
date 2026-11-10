@@ -6,6 +6,7 @@ data class Point(val x: Float, val y: Float)
 /** 인물 기준 좌/우 (ML Kit 규약과 동일: LEFT = 인물의 왼쪽). */
 enum class Joint {
     NOSE,
+    LEFT_EAR, RIGHT_EAR,
     LEFT_SHOULDER, RIGHT_SHOULDER,
     LEFT_ELBOW, RIGHT_ELBOW,
     LEFT_WRIST, RIGHT_WRIST,

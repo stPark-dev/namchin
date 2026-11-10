@@ -34,7 +34,7 @@ class MlKitPoseMapperTest {
     fun `landmarks without a core joint are dropped`() {
         val pose = MlKitPoseMapper.toPersonPose(
             listOf(
-                RawLandmark(PoseLandmark.LEFT_EAR, 1f, 1f, 0.9f),
+                RawLandmark(PoseLandmark.LEFT_EYE, 1f, 1f, 0.9f),
                 RawLandmark(PoseLandmark.NOSE, 1f, 1f, 0.9f),
             ),
             width = 10,

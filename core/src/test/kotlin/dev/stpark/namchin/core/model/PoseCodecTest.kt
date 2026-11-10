@@ -24,7 +24,7 @@ class PoseCodecTest {
 
     @Test
     fun `unknown joints are skipped`() {
-        val decoded = PoseCodec.decode("1.0|NOSE,0.5,0.2,0.9;LEFT_EAR,0.4,0.2,0.9")!!
+        val decoded = PoseCodec.decode("1.0|NOSE,0.5,0.2,0.9;LEFT_EYE,0.4,0.2,0.9")!!
 
         assertEquals(setOf(Joint.NOSE), decoded.keypoints.keys)
     }

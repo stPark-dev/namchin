@@ -14,6 +14,8 @@ object MlKitPoseMapper {
 
     val JOINT_BY_LANDMARK: Map<Int, Joint> = mapOf(
         PoseLandmark.NOSE to Joint.NOSE,
+        PoseLandmark.LEFT_EAR to Joint.LEFT_EAR,
+        PoseLandmark.RIGHT_EAR to Joint.RIGHT_EAR,
         PoseLandmark.LEFT_SHOULDER to Joint.LEFT_SHOULDER,
         PoseLandmark.RIGHT_SHOULDER to Joint.RIGHT_SHOULDER,
         PoseLandmark.LEFT_ELBOW to Joint.LEFT_ELBOW,
