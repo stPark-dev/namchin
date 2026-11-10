@@ -42,6 +42,13 @@ import dev.stpark.namchin.camera.CameraUiState
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.GuidanceText
 import dev.stpark.namchin.camera.ShutterGate
+import dev.stpark.namchin.camera.Feedback
+import dev.stpark.namchin.camera.FeedbackSettings
+import dev.stpark.namchin.camera.GuideVoice
+import dev.stpark.namchin.camera.Haptics
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import dev.stpark.namchin.camera.ZoomLogic
@@ -148,17 +155,38 @@ private fun CameraContent(
     BackHandler(enabled = deckOpen) { deckOpen = false }
 
     val canShoot = ShutterGate.canShoot(referenceId, reference?.id, imageCapture != null, capturing)
-    val shoot = shoot@{
-        val capture = imageCapture ?: return@shoot
-        if (!ShutterGate.canShoot(referenceId, reference?.id, true, capturing)) return@shoot
+    fun shoot(count: Int) {
+        val capture = imageCapture ?: return
+        if (!ShutterGate.canShoot(referenceId, reference?.id, true, capturing)) return
         // 저장되는 사진도 화면의 밝은 영역(레퍼런스 비율)과 같게 자른다. 비율은 촬영 시점에 읽힌다
         capture.setCropAspectRatio(reference?.let { Rational(it.width, it.height) } ?: Rational(3, 4))
         capturing = true
         flash = true
+        vm.onShot()
         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        PhotoSaver.take(context, capture) { uri ->
+        PhotoSaver.takeBurst(context, capture, count) { saved ->
             capturing = false
-            message = if (uri != null) R.string.camera_saved else R.string.camera_save_failed
+            message = when {
+                saved == 0 -> R.string.camera_save_failed
+                saved > 1 -> R.string.camera_saved_burst
+                else -> R.string.camera_saved
+            }
+        }
+    }
+
+    // 음성·진동·자동 셔터
+    val voice = remember { GuideVoice(context) }
+    val haptics = remember { Haptics(context) }
+    DisposableEffect(voice) { onDispose { voice.close() } }
+    val currentShoot by rememberUpdatedState(::shoot)
+    LaunchedEffect(vm) {
+        vm.feedback.collect { event ->
+            when (event) {
+                is Feedback.Speak -> voice.speak(context.getString(GuidanceText.of(event.cue)))
+                Feedback.Tick -> haptics.tick()
+                Feedback.AlignedBuzz -> haptics.aligned()
+                Feedback.Fire -> currentShoot(BURST_COUNT)
+            }
         }
     }
 
@@ -208,6 +236,12 @@ private fun CameraContent(
                         modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 8.dp),
                     )
                 }
+                FeedbackToggles(
+                    settings = state.settings,
+                    showAutoShutter = reference != null,
+                    onChange = vm::updateSettings,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                )
                 if (flash) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.7f)))
                 message?.let {
                     Text(
@@ -231,7 +265,7 @@ private fun CameraContent(
                 ShutterBar(
                     latestReference = all.firstOrNull(),
                     enabled = canShoot,
-                    onShutter = shoot,
+                    onShutter = { shoot(1) },
                     onOpenLibrary = onOpenLibrary,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -272,7 +306,38 @@ private fun CameraContent(
 }
 
 private const val FLASH_MS = 80L
+private const val BURST_COUNT = 3
 private const val MESSAGE_MS = 1_500L
+
+@Composable
+private fun FeedbackToggles(
+    settings: FeedbackSettings,
+    showAutoShutter: Boolean,
+    onChange: (FeedbackSettings) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.End) {
+        Toggle(stringResource(R.string.toggle_voice), settings.voice) { onChange(settings.copy(voice = it)) }
+        Toggle(stringResource(R.string.toggle_vibrate), settings.vibrate) { onChange(settings.copy(vibrate = it)) }
+        if (showAutoShutter) {
+            Toggle(stringResource(R.string.toggle_auto), settings.autoShutter) { onChange(settings.copy(autoShutter = it)) }
+        }
+    }
+}
+
+@Composable
+private fun Toggle(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
+    Text(
+        label,
+        color = if (on) Color.Black else Color.White,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .background(if (on) Color(0xFFFFD600) else Color(0x66000000), RoundedCornerShape(50))
+            .clickable { onToggle(!on) }
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
 
 @Composable
 private fun ZoomButtons(presets: List<Float>, current: Float, onSelect: (Float) -> Unit, modifier: Modifier = Modifier) {

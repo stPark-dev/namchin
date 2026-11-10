@@ -73,4 +73,9 @@
     <string name="guide_cut_wrist">손이 화면 끝에 걸려요. 손까지 담아주세요</string>
     <string name="guide_gaze_left">얼굴이 향한 화면 왼쪽에 여백을 두세요. 폰을 왼쪽으로 돌리세요</string>
     <string name="guide_gaze_right">얼굴이 향한 화면 오른쪽에 여백을 두세요. 폰을 오른쪽으로 돌리세요</string>
+
+    <string name="camera_saved_burst">연속 촬영 사진을 저장했어요</string>
+    <string name="toggle_voice">음성</string>
+    <string name="toggle_vibrate">진동</string>
+    <string name="toggle_auto">자동 셔터</string>
 </resources>

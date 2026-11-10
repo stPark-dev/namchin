@@ -4,6 +4,7 @@ import dev.stpark.namchin.core.guidance.Guidance
 import dev.stpark.namchin.core.guidance.GuidancePrioritizer.STABLE_MS
 import dev.stpark.namchin.core.guidance.Rotation
 import dev.stpark.namchin.core.model.Joint
+import dev.stpark.namchin.core.shutter.AutoShutter
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.model.Point
 import dev.stpark.namchin.core.testutil.STANDING
@@ -32,7 +33,8 @@ class LiveGuidanceTest {
         roll: Float? = 0f,
         now: Long = 0,
         poseEnabled: Boolean = true,
-    ) = LiveGuidance.step(state, LiveInput(reference, current, roll, poseEnabled, now))
+        autoShutter: Boolean = false,
+    ) = LiveGuidance.step(state, LiveInput(reference, current, roll, poseEnabled, now, autoShutter))
 
     @Test
     fun `matching person is aligned with nothing to say`() {
@@ -163,5 +165,44 @@ class LiveGuidanceTest {
 
         assertEquals(Guidance.Level(Rotation.COUNTERCLOCKWISE), out.display)
         assertTrue(Guidance.FeetToBottom in out.cues)
+    }
+
+    @Test
+    fun `auto shutter fires once alignment holds`() {
+        val matching = pose(rightArmRaised)
+
+        val (s1, first) = step(matching, now = 0, autoShutter = true)
+        val (_, held) = step(matching, state = s1, now = AutoShutter.HOLD_MS, autoShutter = true)
+
+        assertFalse(first.fire)
+        assertTrue(held.fire)
+    }
+
+    @Test
+    fun `auto shutter stays quiet when switched off`() {
+        val matching = pose(rightArmRaised)
+
+        val (s1, _) = step(matching, now = 0, autoShutter = false)
+        val (_, held) = step(matching, state = s1, now = AutoShutter.HOLD_MS, autoShutter = false)
+
+        assertFalse(held.fire)
+    }
+
+    @Test
+    fun `a manual shot starts the shutter cooldown`() {
+        val matching = pose(rightArmRaised)
+        val cooled = LiveGuidance.afterManualShot(LiveState(), nowMs = 0)
+
+        val (s1, _) = step(matching, state = cooled, now = 10, autoShutter = true)
+        val (_, held) = step(matching, state = s1, now = 10 + AutoShutter.HOLD_MS, autoShutter = true)
+
+        assertFalse(held.fire)
+    }
+
+    @Test
+    fun `basic mode never fires`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), rollDegrees = 0f, nowMs = 0)
+
+        assertFalse(out.fire)
     }
 }

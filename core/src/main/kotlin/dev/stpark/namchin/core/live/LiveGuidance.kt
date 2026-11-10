@@ -10,12 +10,15 @@ import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.pose.PoseMatch
 import dev.stpark.namchin.core.pose.PoseSimilarity
 import dev.stpark.namchin.core.shutter.Alignment
+import dev.stpark.namchin.core.shutter.AutoShutter
+import dev.stpark.namchin.core.shutter.ShutterState
 
 /**
  * @property reference 레퍼런스 포즈
  * @property current 촬영 영역 기준으로 바꾼 현재 포즈. 인물 미검출이면 null
  * @property rollDegrees 폰 기울기 (시계 방향 양수). 알 수 없으면 null
  * @property poseEnabled false면 포즈 비교 생략 (야경 등)
+ * @property autoShutter 자동 셔터 사용 여부
  */
 data class LiveInput(
     val reference: PersonPose,
@@ -23,6 +26,7 @@ data class LiveInput(
     val rollDegrees: Float?,
     val poseEnabled: Boolean,
     val nowMs: Long,
+    val autoShutter: Boolean = false,
 )
 
 /** 프레임 사이에 이어지는 상태. */
@@ -30,11 +34,13 @@ data class LiveState(
     val previousCues: List<Guidance> = emptyList(),
     val preferMirrored: Boolean = false,
     val guidance: GuidanceState = GuidanceState(),
+    val shutter: ShutterState = ShutterState.Idle,
 )
 
 /**
  * @property cues 이번 프레임의 모든 안내 (display는 그중 최우선)
  * @property aligned 찍어도 되는가. 비교 기준(구도·포즈)이 하나도 없으면 항상 false
+ * @property fire 이번 프레임에 자동 셔터를 누른다
  */
 data class LiveOutput(
     val display: Guidance?,
@@ -42,10 +48,15 @@ data class LiveOutput(
     val announce: Guidance?,
     val aligned: Boolean,
     val match: PoseMatch?,
+    val fire: Boolean = false,
 )
 
 /** 카메라 한 프레임 → 안내/일치 판정. 순수 함수. */
 object LiveGuidance {
+
+    /** 수동으로 찍었으면 자동 셔터가 바로 이어 찍지 않게 쉰다. */
+    fun afterManualShot(state: LiveState, nowMs: Long): LiveState =
+        state.copy(shutter = AutoShutter.afterManualShot(nowMs))
 
     /**
      * 기본 모드(레퍼런스 없음): 수평 + 일반 구도 규칙.
@@ -76,18 +87,22 @@ object LiveGuidance {
         val cues = if (framingCues == null) alignment.cues + listOfNotNull(levelCue) else alignment.cues
         val hasConstraint = referenceFrame != null || match != null
         val decision = GuidancePrioritizer.decide(cues, state.guidance, input.nowMs)
+        val aligned = alignment.aligned && hasConstraint
+        val shutter = AutoShutter.step(state.shutter, aligned, input.autoShutter, input.nowMs)
 
         val nextState = LiveState(
             previousCues = cues,
             preferMirrored = match?.mirrored ?: state.preferMirrored,
             guidance = decision.state,
+            shutter = shutter.state,
         )
         return nextState to LiveOutput(
             display = decision.display,
             cues = cues,
             announce = decision.announce,
-            aligned = alignment.aligned && hasConstraint,
+            aligned = aligned,
             match = match,
+            fire = shutter.fire,
         )
     }
 }

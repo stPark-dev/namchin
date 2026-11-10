@@ -12,7 +12,10 @@ import dev.stpark.namchin.core.live.Region
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.data.Reference
 import dev.stpark.namchin.ml.MlKitPoseMapper
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -29,6 +32,7 @@ data class CameraUiState(
     val rollDegrees: Float? = null,
     val analysisMs: Long = 0,
     val fps: Float = 0f,
+    val settings: FeedbackSettings = FeedbackSettings(),
 )
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
@@ -36,6 +40,11 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<CameraUiState> = _state.asStateFlow()
     private var live = LiveState()
     private var lastFrameAt = 0L
+    private var wasAligned = false
+    private val _feedback = MutableSharedFlow<Feedback>(extraBufferCapacity = FEEDBACK_BUFFER)
+
+    /** 말하기·진동·자동 셔터 이벤트 (한 번씩만 처리). */
+    val feedback: SharedFlow<Feedback> = _feedback.asSharedFlow()
 
     /**
      * 화면에 들어오거나 레퍼런스를 바꿀 때마다 새로 시작한다.
@@ -45,7 +54,15 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
     fun start(reference: Reference?) {
         live = LiveState()
         lastFrameAt = 0L
-        _state.value = CameraUiState(reference = reference)
+        wasAligned = false
+        _state.value = CameraUiState(reference = reference, settings = _state.value.settings)
+    }
+
+    fun updateSettings(settings: FeedbackSettings) = _state.update { it.copy(settings = settings) }
+
+    /** 수동이든 자동이든 찍었으면 자동 셔터를 잠시 쉬게 한다. */
+    fun onShot() {
+        live = LiveGuidance.afterManualShot(live, SystemClock.elapsedRealtime())
     }
 
     fun onTilt(degrees: Float?) = _state.update { it.copy(rollDegrees = degrees) }
@@ -65,11 +82,18 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             reference == null -> LiveGuidance.stepBasic(live, current, snapshot.rollDegrees, now)
             refPose != null -> LiveGuidance.step(
                 live,
-                LiveInput(refPose, current, snapshot.rollDegrees, poseEnabled = true, nowMs = now),
+                LiveInput(
+                    refPose, current, snapshot.rollDegrees, poseEnabled = true, nowMs = now,
+                    autoShutter = snapshot.settings.autoShutter,
+                ),
             )
             else -> live to null
         }
         live = next
+        output?.let { out ->
+            FeedbackPlanner.plan(wasAligned, out, snapshot.settings).forEach { _feedback.tryEmit(it) }
+            wasAligned = out.aligned
+        }
         val instantFps = if (lastFrameAt > 0) 1000f / (now - lastFrameAt).coerceAtLeast(1) else 0f
         lastFrameAt = now
         _state.update {
@@ -85,5 +109,6 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val FPS_SMOOTHING = 0.9f
+        const val FEEDBACK_BUFFER = 8
     }
 }
