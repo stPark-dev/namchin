@@ -118,4 +118,5 @@
 
     <string name="guide_hold_steady">두 손으로 단단히 잡으세요</string>
     <string name="camera_night">야간 · 포즈 비교 꺼짐</string>
+    <string name="peek_apply">이 레퍼런스 적용</string>
 </resources>

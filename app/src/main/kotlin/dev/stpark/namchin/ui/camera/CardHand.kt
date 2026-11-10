@@ -47,6 +47,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.stpark.namchin.ui.theme.Brand
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalHapticFeedback
 import dev.stpark.namchin.ui.theme.Jua
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -76,16 +84,22 @@ fun ReferenceCard(reference: Reference, modifier: Modifier = Modifier) {
 }
 
 /**
- * 오른쪽 아래 모서리에 2~3장 빼꼼. 앞 카드를 탭하면 적용, 손패를 위로 쓸면 전체 펼침.
+ * 오른쪽 아래 모서리에 2~3장 빼꼼. 카드를 탭하거나 꾹 눌러 끌어올리면 크게 보기, 손패를 위로 쓸면 전체 펼침.
  * @param references 앞에 보일 순서대로 (첫 번째가 맨 앞)
  */
 @Composable
 fun CardHand(
     references: List<Reference>,
-    onSelect: (Reference) -> Unit,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
+    peekingId: Long? = null,
+    onPeekOpen: (Reference, Rect, Float) -> Unit = { _, _, _ -> },
+    onPeekStart: (Reference, Rect, Float) -> Unit = { _, _, _ -> },
+    onPeekDrag: (Float) -> Unit = {},
+    onPeekEnd: () -> Unit = {},
 ) {
+    val haptic = LocalHapticFeedback.current
+    val bounds = remember { mutableMapOf<Long, Rect>() }
     val shown = references.take(CardFan.MAX_CARDS)
     if (shown.isEmpty()) return
     val fan = CardFan.layout(shown.size)
@@ -118,7 +132,31 @@ fun CardHand(
                     .offset((pose.offsetXDp + 30).dp, (pose.offsetYDp + 12).dp)
                     .rotate(pose.rotationDeg)
                     .size(96.dp, 128.dp)
-                    .clickable { onSelect(reference) },
+                    .onGloballyPositioned { bounds[reference.id] = it.boundsInRoot() }
+                    // 크게 보는 중인 카드는 오버레이가 그리므로 손패에선 숨김
+                    .alpha(if (peekingId == reference.id) 0f else 1f)
+                    // 탭 = 크게 보기로 부드럽게 열림 (적용은 그 화면의 버튼으로). 꾹 누르면 탭으로 치지 않음
+                    .pointerInput(reference.id) {
+                        detectTapGestures(
+                            onTap = { onPeekOpen(reference, bounds[reference.id] ?: Rect.Zero, pose.rotationDeg) },
+                            onLongPress = {},
+                        )
+                    }
+                    // 꾹 누른 채 위로 끌기 = 크게 보기
+                    .pointerInput(reference.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onPeekStart(reference, bounds[reference.id] ?: Rect.Zero, pose.rotationDeg)
+                            },
+                            onDrag = { change, drag ->
+                                change.consume()
+                                onPeekDrag(drag.y)
+                            },
+                            onDragEnd = onPeekEnd,
+                            onDragCancel = onPeekEnd,
+                        )
+                    },
             )
         }
     }

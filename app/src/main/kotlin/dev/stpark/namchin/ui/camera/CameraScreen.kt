@@ -44,6 +44,8 @@ import dev.stpark.namchin.camera.Haptics
 import dev.stpark.namchin.settings.AppSettingsStore
 import dev.stpark.namchin.ui.theme.Brand
 import dev.stpark.namchin.review.ReviewState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalDensity
 import dev.stpark.namchin.core.tagging.Tag
 import dev.stpark.namchin.ml.SceneEmbedder
 import kotlinx.coroutines.Dispatchers
@@ -188,8 +190,12 @@ private fun CameraContent(
     LaunchedEffect(message) { if (message != null) { delay(MESSAGE_MS); message = null } }
     BackHandler(enabled = deckOpen) { deckOpen = false }
     BackHandler(enabled = reviewing) { reviewVm.close() }
-    // 카드 목록이나 결과 화면이 떠 있는 동안 자동 셔터를 멈춘다
-    LaunchedEffect(deckOpen, reviewing) { vm.pauseAutoShutter(deckOpen || reviewing) }
+    val scope = rememberCoroutineScope()
+    val peek = remember { CardPeekState(scope) }
+    val peekDistancePx = with(LocalDensity.current) { PEEK_DISTANCE.toPx() }
+    BackHandler(enabled = peek.active) { peek.dismiss() }
+    // 카드 목록·결과 화면·크게 보기가 떠 있는 동안 자동 셔터를 멈춘다
+    LaunchedEffect(deckOpen, reviewing, peek.active) { vm.pauseAutoShutter(deckOpen || reviewing || peek.active) }
 
     // 화면을 떠나거나 백그라운드로 가면 진행 중인 연속 촬영을 멈춘다
     val screenActive = remember { AtomicBoolean(true) }
@@ -242,7 +248,7 @@ private fun CameraContent(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val currentShoot by rememberUpdatedState(::shoot)
-    val currentCanShoot by rememberUpdatedState(canShoot && !deckOpen && !reviewing)
+    val currentCanShoot by rememberUpdatedState(canShoot && !deckOpen && !reviewing && !peek.active)
     LaunchedEffect(vm) {
         vm.feedback.collect { event ->
             when (event) {
@@ -361,12 +367,23 @@ private fun CameraContent(
                 CardHand(
                     // 지금 장면과 배경이 비슷한 레퍼런스가 앞으로
                     references = orderedCards.filter { it.id != referenceId },
-                    onSelect = { onSelectReference(it.id) },
                     onExpand = { deckOpen = true },
                     modifier = Modifier.align(Alignment.BottomEnd).width(150.dp).fillMaxHeight(),
+                    peekingId = peek.reference?.id,
+                    onPeekOpen = peek::openFrom,
+                    onPeekStart = peek::start,
+                    onPeekDrag = { peek.dragBy(it, peekDistancePx) },
+                    onPeekEnd = peek::release,
                 )
             }
         }
+        PeekOverlay(
+            state = peek,
+            onApply = { reference ->
+                onSelectReference(reference.id)
+                peek.dismiss()
+            },
+        )
         ResultOverlay(
             state = review,
             onKeep = { id ->
