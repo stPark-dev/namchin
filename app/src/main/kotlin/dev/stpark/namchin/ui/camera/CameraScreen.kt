@@ -46,7 +46,10 @@ import dev.stpark.namchin.camera.Feedback
 import dev.stpark.namchin.camera.FeedbackSettings
 import dev.stpark.namchin.camera.GuideVoice
 import dev.stpark.namchin.camera.Haptics
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.lifecycle.LifecycleEventObserver
+import java.util.concurrent.atomic.AtomicBoolean
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -153,6 +156,24 @@ private fun CameraContent(
     LaunchedEffect(flash) { if (flash) { delay(FLASH_MS); flash = false } }
     LaunchedEffect(message) { if (message != null) { delay(MESSAGE_MS); message = null } }
     BackHandler(enabled = deckOpen) { deckOpen = false }
+    LaunchedEffect(deckOpen) { vm.pauseAutoShutter(deckOpen) }
+
+    // 화면을 떠나거나 백그라운드로 가면 진행 중인 연속 촬영을 멈춘다
+    val screenActive = remember { AtomicBoolean(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> screenActive.set(true)
+                Lifecycle.Event.ON_STOP -> screenActive.set(false)
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            screenActive.set(false)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val canShoot = ShutterGate.canShoot(referenceId, reference?.id, imageCapture != null, capturing)
     fun shoot(count: Int) {
@@ -163,8 +184,8 @@ private fun CameraContent(
         capturing = true
         flash = true
         vm.onShot()
-        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        PhotoSaver.takeBurst(context, capture, count) { saved ->
+        if (state.settings.vibrate) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        PhotoSaver.takeBurst(context, capture, count, isActive = { screenActive.get() }) { saved ->
             capturing = false
             message = when {
                 saved == 0 -> R.string.camera_save_failed
@@ -178,14 +199,21 @@ private fun CameraContent(
     val voice = remember { GuideVoice(context) }
     val haptics = remember { Haptics(context) }
     DisposableEffect(voice) { onDispose { voice.close() } }
+    LaunchedEffect(state.settings.voice) { if (!state.settings.voice) voice.stop() }
+    DisposableEffect(lifecycleOwner, voice) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) voice.stop() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val currentShoot by rememberUpdatedState(::shoot)
+    val currentCanShoot by rememberUpdatedState(canShoot && !deckOpen)
     LaunchedEffect(vm) {
         vm.feedback.collect { event ->
             when (event) {
                 is Feedback.Speak -> voice.speak(context.getString(GuidanceText.of(event.cue)))
                 Feedback.Tick -> haptics.tick()
                 Feedback.AlignedBuzz -> haptics.aligned()
-                Feedback.Fire -> currentShoot(BURST_COUNT)
+                Feedback.Fire -> if (!currentCanShoot) vm.onFireRejected() else currentShoot(BURST_COUNT)
             }
         }
     }
@@ -238,7 +266,7 @@ private fun CameraContent(
                 }
                 FeedbackToggles(
                     settings = state.settings,
-                    showAutoShutter = reference != null,
+                    showAutoShutter = reference?.pose != null,
                     onChange = vm::updateSettings,
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                 )
@@ -334,7 +362,8 @@ private fun Toggle(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .background(if (on) Color(0xFFFFD600) else Color(0x66000000), RoundedCornerShape(50))
-            .clickable { onToggle(!on) }
+            // 화면 읽기(TalkBack)가 스위치와 켜짐/꺼짐 상태를 읽도록
+            .toggleable(value = on, role = Role.Switch, onValueChange = onToggle)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     )
 }

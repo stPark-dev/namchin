@@ -13,16 +13,20 @@ import androidx.core.content.ContextCompat
 /** ImageCapture → 갤러리 `DCIM/남친렌즈`. 결과 콜백은 메인 스레드. */
 object PhotoSaver {
     private const val TAG = "PhotoSaver"
+    /** 셔터음은 촬영마다 쓰므로 앱이 살아 있는 동안 하나를 계속 둔다 (SoundPool 하나, 작음). */
     private val sound by lazy { MediaActionSound().apply { load(MediaActionSound.SHUTTER_CLICK) } }
 
-    /** count장을 차례로 찍는다. 각 장마다 셔터음(국내 규정). 결과는 저장된 장 수. */
-    fun takeBurst(context: Context, capture: ImageCapture, count: Int, onDone: (saved: Int) -> Unit) {
-        fun shot(remaining: Int, saved: Int) {
-            if (remaining == 0) return onDone(saved)
-            take(context, capture) { uri -> shot(remaining - 1, saved + if (uri != null) 1 else 0) }
-        }
-        shot(count, 0)
-    }
+    /**
+     * count장을 차례로 찍는다. 각 장마다 셔터음(국내 규정).
+     * 실패하거나 isActive()가 false가 되면(화면 이탈) 멈춘다. 결과는 저장된 장 수.
+     */
+    fun takeBurst(
+        context: Context,
+        capture: ImageCapture,
+        count: Int,
+        isActive: () -> Boolean,
+        onDone: (saved: Int) -> Unit,
+    ) = Burst.run(count, isActive, { done -> take(context, capture) { uri -> done(uri != null) } }, onDone)
 
     fun take(context: Context, capture: ImageCapture, onResult: (Uri?) -> Unit) {
         sound.play(MediaActionSound.SHUTTER_CLICK)

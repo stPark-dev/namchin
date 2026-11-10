@@ -205,4 +205,18 @@ class LiveGuidanceTest {
 
         assertFalse(out.fire)
     }
+
+    @Test
+    fun `a fire that could not be taken is rearmed`() {
+        val matching = pose(rightArmRaised)
+        val (s1, _) = step(matching, now = 0, autoShutter = true)
+        val (s2, fired) = step(matching, state = s1, now = AutoShutter.HOLD_MS, autoShutter = true)
+        assertTrue(fired.fire)
+
+        val rearmed = LiveGuidance.cancelFire(s2)
+        val (s3, _) = step(matching, state = rearmed, now = AutoShutter.HOLD_MS + 10, autoShutter = true)
+        val (_, again) = step(matching, state = s3, now = 2 * AutoShutter.HOLD_MS + 10, autoShutter = true)
+
+        assertTrue(again.fire)
+    }
 }

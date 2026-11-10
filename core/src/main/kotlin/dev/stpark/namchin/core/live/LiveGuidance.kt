@@ -58,6 +58,9 @@ object LiveGuidance {
     fun afterManualShot(state: LiveState, nowMs: Long): LiveState =
         state.copy(shutter = AutoShutter.afterManualShot(nowMs))
 
+    /** 자동 셔터가 발사됐지만 실제로 찍지 못했으면(셔터 막힘 등) 처음부터 다시 기다린다. */
+    fun cancelFire(state: LiveState): LiveState = state.copy(shutter = ShutterState.Idle)
+
     /**
      * 기본 모드(레퍼런스 없음): 수평 + 일반 구도 규칙.
      * 풍경만 찍을 수도 있으니 인물이 없어도 재촉하지 않는다. 자동 셔터가 없으므로 aligned는 항상 false.

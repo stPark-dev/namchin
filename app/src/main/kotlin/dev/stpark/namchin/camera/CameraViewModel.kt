@@ -60,6 +60,17 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateSettings(settings: FeedbackSettings) = _state.update { it.copy(settings = settings) }
 
+    /** 카드 목록이 열려 있는 동안 등 자동 셔터를 잠시 멈춘다. */
+    private var autoShutterPaused = false
+    fun pauseAutoShutter(paused: Boolean) {
+        autoShutterPaused = paused
+    }
+
+    /** 자동 셔터가 발사됐지만 찍지 못했으면 다시 기다리게 한다. */
+    fun onFireRejected() {
+        live = LiveGuidance.cancelFire(live)
+    }
+
     /** 수동이든 자동이든 찍었으면 자동 셔터를 잠시 쉬게 한다. */
     fun onShot() {
         live = LiveGuidance.afterManualShot(live, SystemClock.elapsedRealtime())
@@ -84,14 +95,17 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
                 live,
                 LiveInput(
                     refPose, current, snapshot.rollDegrees, poseEnabled = true, nowMs = now,
-                    autoShutter = snapshot.settings.autoShutter,
+                    autoShutter = snapshot.settings.autoShutter && !autoShutterPaused,
                 ),
             )
             else -> live to null
         }
         live = next
         output?.let { out ->
-            FeedbackPlanner.plan(wasAligned, out, snapshot.settings).forEach { _feedback.tryEmit(it) }
+            FeedbackPlanner.plan(wasAligned, out, snapshot.settings).forEach { event ->
+                // 셔터 이벤트가 버려지면 다시 기다리게 (안 그러면 포즈를 풀 때까지 안 찍힘)
+                if (!_feedback.tryEmit(event) && event == Feedback.Fire) onFireRejected()
+            }
             wasAligned = out.aligned
         }
         val instantFps = if (lastFrameAt > 0) 1000f / (now - lastFrameAt).coerceAtLeast(1) else 0f
