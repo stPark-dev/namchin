@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme_logo_dark.png">
+    <img src="docs/brand/readme_logo_light.png" alt="남친렌즈" width="480">
+  </picture>
+</p>
+
 # 남친렌즈 (Namchin Lens)
 
 > **사진 못 찍는 남자친구를 위한 카메라.**
