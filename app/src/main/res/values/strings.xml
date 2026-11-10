@@ -119,4 +119,9 @@
     <string name="guide_hold_steady">두 손으로 단단히 잡으세요</string>
     <string name="camera_night">야간 · 포즈 비교 꺼짐</string>
     <string name="peek_apply">이 레퍼런스 적용</string>
+    <string name="color_match">레퍼런스 색감</string>
+    <string name="color_save">색감 입혀 저장</string>
+    <string name="color_saving">색감 입혀 저장 중…</string>
+    <string name="color_saved">색감 입힌 사진을 따로 저장했어요</string>
+    <string name="color_save_failed">색감 사진을 저장하지 못했어요</string>
 </resources>

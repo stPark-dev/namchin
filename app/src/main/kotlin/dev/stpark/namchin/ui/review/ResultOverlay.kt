@@ -20,6 +20,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import dev.stpark.namchin.review.ColorPreview
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,7 +66,15 @@ private val SHAPE = RoundedCornerShape(14.dp)
 
 /** 연속 촬영 결과: 베스트 컷 크게, 레퍼런스와 나란히 비교, 아래 줄에서 다른 컷 보기. */
 @Composable
-fun ResultOverlay(state: ReviewState, onKeep: (String) -> Unit, onClose: () -> Unit) {
+fun ResultOverlay(
+    state: ReviewState,
+    onKeep: (String) -> Unit,
+    onClose: () -> Unit,
+    color: ColorPreview? = null,
+    onPreviewColor: (String, Float) -> Unit = { _, _ -> },
+    onClearColor: () -> Unit = {},
+    onSaveColored: (String, Float) -> Unit = { _, _ -> },
+) {
     if (state == ReviewState.Hidden) return
     Box(
         Modifier
@@ -79,18 +97,34 @@ fun ResultOverlay(state: ReviewState, onKeep: (String) -> Unit, onClose: () -> U
                 CircularProgressIndicator(color = Brand.Yellow)
                 Text(stringResource(R.string.review_analyzing), color = Color.White)
             }
-            is ReviewState.Ready -> ReadyContent(state, onKeep, onClose)
+            is ReviewState.Ready -> ReadyContent(state, onKeep, onClose, color, onPreviewColor, onClearColor, onSaveColored)
             ReviewState.Hidden -> Unit
         }
     }
 }
 
 @Composable
-private fun ReadyContent(state: ReviewState.Ready, onKeep: (String) -> Unit, onClose: () -> Unit) {
+private fun ReadyContent(
+    state: ReviewState.Ready,
+    onKeep: (String) -> Unit,
+    onClose: () -> Unit,
+    color: ColorPreview?,
+    onPreviewColor: (String, Float) -> Unit,
+    onClearColor: () -> Unit,
+    onSaveColored: (String, Float) -> Unit,
+) {
     var selectedId by remember(state) { mutableStateOf((state.items.firstOrNull { it.best } ?: state.items.firstOrNull())?.id) }
     var compare by remember(state) { mutableStateOf(state.reference != null) }
     val selected = state.items.firstOrNull { it.id == selectedId } ?: state.items.firstOrNull() ?: return
     val reference = state.reference
+    var colorOn by remember(state) { mutableStateOf(false) }
+    var strength by remember(state) { mutableFloatStateOf(DEFAULT_STRENGTH) }
+    // 색감 켜짐·강도·선택 사진이 바뀌면 미리보기 다시 (뷰모델이 마지막 요청만 처리)
+    LaunchedEffect(colorOn, strength, selected.id) {
+        if (colorOn) onPreviewColor(selected.id, strength) else onClearColor()
+    }
+    // 지금 선택한 사진의 색감 미리보기가 준비됐으면 그걸 보여준다
+    val shown: Any = color?.takeIf { colorOn && it.shotId == selected.id }?.bitmap?.asImageBitmap() ?: selected.id
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -120,12 +154,21 @@ private fun ReadyContent(state: ReviewState.Ready, onKeep: (String) -> Unit, onC
                         AsyncImage(File(reference.imagePath), null, Modifier.fillMaxWidth().aspectRatio(reference.aspectRatio).clip(SHAPE), contentScale = ContentScale.Crop)
                     }
                     Labeled(stringResource(R.string.review_best), Modifier.weight(1f)) {
-                        AsyncImage(selected.id, null, Modifier.fillMaxWidth().aspectRatio(reference.aspectRatio).clip(SHAPE), contentScale = ContentScale.Crop)
+                        ShotImage(shown, Modifier.fillMaxWidth().aspectRatio(reference.aspectRatio).clip(SHAPE), ContentScale.Crop)
                     }
                 }
             } else {
-                AsyncImage(selected.id, null, Modifier.fillMaxSize().clip(SHAPE), contentScale = ContentScale.Fit)
+                ShotImage(shown, Modifier.fillMaxSize().clip(SHAPE), ContentScale.Fit)
             }
+        }
+        if (reference != null) {
+            ColorControls(
+                on = colorOn,
+                strength = strength,
+                onToggle = { colorOn = it },
+                onStrength = { strength = it },
+                onSave = { onSaveColored(selected.id, strength) },
+            )
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.items, key = { it.id }) { item ->
@@ -150,6 +193,59 @@ private fun ReadyContent(state: ReviewState.Ready, onKeep: (String) -> Unit, onC
         }
     }
 }
+
+@Composable
+private fun ShotImage(model: Any, modifier: Modifier, scale: ContentScale) {
+    if (model is ImageBitmap) {
+        Image(model, null, modifier, contentScale = scale)
+    } else {
+        AsyncImage(model, null, modifier, contentScale = scale)
+    }
+}
+
+/** 레퍼런스 색감: 켜기 · 강도 · 새 파일로 저장 (원본 유지) */
+@Composable
+private fun ColorControls(
+    on: Boolean,
+    strength: Float,
+    onToggle: (Boolean) -> Unit,
+    onStrength: (Float) -> Unit,
+    onSave: () -> Unit,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Palette, null, tint = Brand.Yellow, modifier = Modifier.size(20.dp))
+            Text(
+                stringResource(R.string.color_match),
+                color = Color.White,
+                modifier = Modifier.padding(start = 8.dp).weight(1f),
+            )
+            if (on) {
+                TextButton(onClick = onSave) {
+                    Text(stringResource(R.string.color_save), color = Brand.Yellow, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Switch(
+                checked = on,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(checkedTrackColor = Brand.Yellow, checkedThumbColor = Brand.Ink),
+            )
+        }
+        if (on) {
+            Slider(
+                value = strength,
+                onValueChange = onStrength,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Brand.Yellow,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.2f),
+                ),
+            )
+        }
+    }
+}
+
+private const val DEFAULT_STRENGTH = 0.8f
 
 @Composable
 private fun Labeled(label: String, modifier: Modifier, content: @Composable () -> Unit) {

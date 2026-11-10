@@ -234,8 +234,8 @@ private fun CameraContent(
             capturing = false
             when {
                 saved.isEmpty() -> message = R.string.camera_save_failed
-                // 여러 장이면 베스트 컷 결과 화면
-                saved.size > 1 && screenActive.get() -> reviewVm.review(saved, reference)
+                // 여러 장이거나 레퍼런스 모드면 결과 화면 (베스트 컷·레퍼런스 색감)
+                (saved.size > 1 || reference != null) && screenActive.get() -> reviewVm.review(saved, reference)
                 saved.size > 1 -> message = R.string.camera_saved_burst
                 else -> message = R.string.camera_saved
             }
@@ -394,8 +394,18 @@ private fun CameraContent(
                 peek.applyTo(card) { onSelectReference(it.id) }
             },
         )
+        val colorPreview by reviewVm.color.collectAsStateWithLifecycle()
         ResultOverlay(
             state = review,
+            color = colorPreview,
+            onPreviewColor = reviewVm::previewColor,
+            onClearColor = reviewVm::clearColor,
+            onSaveColored = { id, strength ->
+                message = R.string.color_saving
+                reviewVm.saveColored(id, strength) { ok ->
+                    message = if (ok) R.string.color_saved else R.string.color_save_failed
+                }
+            },
             onKeep = { id ->
                 reviewVm.keepOnly(id) { failed ->
                     message = if (failed == 0) R.string.review_kept else R.string.review_keep_failed
