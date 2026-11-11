@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AccessibilityNew
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Grid3x3
 import androidx.compose.material.icons.rounded.GridOff
@@ -145,6 +146,9 @@ fun ControlRail(
     templateLabel: String? = null,
     templateActive: Boolean = false,
     onTemplate: () -> Unit = {},
+    filterLabel: String = "",
+    filterActive: Boolean = false,
+    onFilter: () -> Unit = {},
 ) {
     Column(
         modifier
@@ -170,22 +174,24 @@ fun ControlRail(
         }
         IconToggle(Icons.Rounded.Grid3x3, Icons.Rounded.GridOff, grid, stringResource(R.string.cd_grid), onGrid)
         if (templateLabel != null) {
-            // 켜고 끄는 스위치가 아니라 고르기 줄을 여는 버튼. 색은 틀을 골랐는지 보여준다
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .clickable(role = Role.Button, onClickLabel = stringResource(R.string.cd_template_open), onClick = onTemplate)
-                    .semantics { contentDescription = templateLabel },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.AccessibilityNew, null,
-                    tint = if (templateActive) Brand.Yellow else Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(22.dp),
-                )
-            }
+            PickerButton(Icons.Rounded.AccessibilityNew, templateLabel, stringResource(R.string.cd_template_open), templateActive, onTemplate)
         }
+        PickerButton(Icons.Rounded.AutoAwesome, filterLabel, stringResource(R.string.cd_filter_open), filterActive, onFilter)
+    }
+}
+
+/** 켜고 끄는 스위치가 아니라 고르기 줄을 여는 버튼. 색은 무언가 골랐는지 보여준다. */
+@Composable
+private fun PickerButton(icon: ImageVector, label: String, clickLabel: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClickLabel = clickLabel, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = if (active) Brand.Yellow else Color.White.copy(alpha = 0.7f), modifier = Modifier.size(22.dp))
     }
 }
 

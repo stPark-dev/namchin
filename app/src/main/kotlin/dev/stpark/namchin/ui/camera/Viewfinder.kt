@@ -25,6 +25,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraViewModel
+import dev.stpark.namchin.core.color.Filter
+import dev.stpark.namchin.review.Look
+import dev.stpark.namchin.ui.common.lookLabel
 import dev.stpark.namchin.camera.CameraUiState
 import dev.stpark.namchin.camera.ZoomLogic
 import dev.stpark.namchin.core.framing.FramingAnalyzer
@@ -58,7 +61,8 @@ internal fun Viewfinder(
     // 제스처 블록은 범위가 바뀔 때만 다시 시작하므로 콜백은 최신 것을 부른다.
     // 배율 계산은 부모가 실제 상태로 한다 (여기서 받은 zoom.ratio는 다음 화면 갱신 전까지 옛 값)
     val currentOnPinch by rememberUpdatedState(onPinch)
-    var pickerOpen by rememberSaveable { mutableStateOf(false) }
+    // 구도 틀 / 필터 고르기 줄 (한 번에 하나만)
+    var picker by rememberSaveable { mutableStateOf(Picker.NONE) }
     Box(
         Modifier
             .fillMaxWidth()
@@ -74,6 +78,7 @@ internal fun Viewfinder(
             onExposure = vm::onExposure,
             onCameraReady = onCameraReady,
             modifier = Modifier.fillMaxSize(),
+            filter = state.filter,
         )
         val region = state.region
         if (region != null && grid) GridOverlay(region, Modifier.fillMaxSize())
@@ -108,15 +113,25 @@ internal fun Viewfinder(
                 null
             },
             templateActive = state.template != null,
-            onTemplate = { pickerOpen = !pickerOpen },
+            onTemplate = { picker = if (picker == Picker.TEMPLATE) Picker.NONE else Picker.TEMPLATE },
+            filterLabel = stringResource(R.string.cd_filter_current, stringResource(lookLabel(state.filter?.let(Look::Preset)))),
+            filterActive = state.filter != null,
+            onFilter = { picker = if (picker == Picker.FILTER) Picker.NONE else Picker.FILTER },
         )
         Column(
             Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (reference == null && pickerOpen) {
-                TemplatePicker(state.template, onSelect = { vm.setTemplate(it); pickerOpen = false })
+            if (reference == null && picker == Picker.TEMPLATE) {
+                TemplatePicker(state.template, onSelect = { vm.setTemplate(it); picker = Picker.NONE })
+            }
+            if (picker == Picker.FILTER) {
+                ChoicePicker(
+                    listOf(null) + Filter.entries, state.filter,
+                    label = { f -> lookLabel(f?.let(Look::Preset)) },
+                    onSelect = { vm.setFilter(it); picker = Picker.NONE },
+                )
             }
             zoom.range?.let { range ->
                 ZoomCapsule(
@@ -130,3 +145,5 @@ internal fun Viewfinder(
         message?.let { Toast(stringResource(it), Modifier.align(Alignment.Center)) }
     }
 }
+
+private enum class Picker { NONE, TEMPLATE, FILTER }

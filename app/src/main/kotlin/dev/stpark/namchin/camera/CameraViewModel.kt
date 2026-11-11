@@ -3,6 +3,7 @@ package dev.stpark.namchin.camera
 import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
+import dev.stpark.namchin.core.color.Filter
 import dev.stpark.namchin.core.composition.CompositionTemplate
 import dev.stpark.namchin.core.guidance.Guidance
 import dev.stpark.namchin.core.live.CropRegion
@@ -56,6 +57,8 @@ data class CameraUiState(
     val template: CompositionTemplate? = null,
     /** 3분할 틀에서 인물을 둘 쪽 */
     val templateSide: Guidance.Side? = null,
+    /** 미리보기에 입힌 필터 (결과 화면에서도 미리 골라 둔다) */
+    val filter: Filter? = null,
 )
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
@@ -87,8 +90,11 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             cardOrder = _state.value.cardOrder,
             lowLight = lowLight.lowLight,
             template = _state.value.template,
+            filter = _state.value.filter,
         )
     }
+
+    fun setFilter(filter: Filter?) = _state.update { it.copy(filter = filter) }
 
     fun setTemplate(template: CompositionTemplate?) {
         _state.update { it.copy(template = template) }

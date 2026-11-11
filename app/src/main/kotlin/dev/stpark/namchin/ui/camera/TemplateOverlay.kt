@@ -74,6 +74,16 @@ fun TemplatePicker(
     selected: CompositionTemplate?,
     onSelect: (CompositionTemplate?) -> Unit,
     modifier: Modifier = Modifier,
+) = ChoicePicker(listOf(null) + CompositionTemplate.entries, selected, ::templateLabel, onSelect, modifier)
+
+/** 미리보기 위 가로 고르기 줄 (하나만 고름). */
+@Composable
+fun <T> ChoicePicker(
+    choices: List<T>,
+    selected: T,
+    label: (T) -> Int,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier
@@ -84,19 +94,19 @@ fun TemplatePicker(
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        (listOf(null) + CompositionTemplate.entries).forEach { template ->
-            val isSelected = template == selected
+        choices.forEach { choice ->
+            val isSelected = choice == selected
             Box(
                 Modifier
                     .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(50))
                     .background(if (isSelected) Brand.Ink.copy(alpha = 0.8f) else Color.Transparent)
                     .border(1.dp, if (isSelected) Brand.Yellow else Color.Transparent, RoundedCornerShape(50))
-                    .selectable(selected = isSelected, role = Role.RadioButton) { onSelect(template) }
+                    .selectable(selected = isSelected, role = Role.RadioButton) { onSelect(choice) }
                     .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(stringResource(templateLabel(template)), color = if (isSelected) Brand.Yellow else Color.White, fontSize = 13.sp)
+                Text(stringResource(label(choice)), color = if (isSelected) Brand.Yellow else Color.White, fontSize = 13.sp)
             }
         }
     }

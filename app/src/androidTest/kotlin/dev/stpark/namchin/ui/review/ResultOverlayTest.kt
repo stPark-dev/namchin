@@ -13,6 +13,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.stpark.namchin.core.bestshot.ReviewItem
+import dev.stpark.namchin.core.color.Filter
+import dev.stpark.namchin.review.Look
 import dev.stpark.namchin.review.ReviewState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -26,7 +28,10 @@ class ResultOverlayTest {
     val rule = createComposeRule()
 
     private val state = ReviewState.Ready(
-        items = listOf(ReviewItem(id = "content://shot/1", score = 1f, best = true, eyesClosed = false)),
+        items = listOf(
+            ReviewItem(id = "content://shot/1", score = 1f, best = true, eyesClosed = false),
+            ReviewItem(id = "content://shot/2", score = 0.5f, best = false, eyesClosed = false),
+        ),
         reference = null,
     )
 
@@ -93,5 +98,44 @@ class ResultOverlayTest {
         }
 
         rule.runOnIdle { assertEquals(false, zoomed) }
+    }
+
+    @Test
+    fun filtersAreOfferedWithoutAReferenceAndPreviewWhenPicked() {
+        var previewed: Look? = null
+        rule.setContent {
+            ResultOverlay(state, onKeep = {}, onClose = {}, onPreviewColor = { _, look, _ -> previewed = look })
+        }
+
+        rule.onNodeWithText("레퍼런스 색감").assertDoesNotExist()
+        fingerTap("필름")
+
+        rule.runOnIdle { assertEquals(Look.Preset(Filter.FILM), previewed) }
+    }
+
+    @Test
+    fun theCameraFilterIsPickedAlready() {
+        var previewed: Look? = null
+        rule.setContent {
+            ResultOverlay(
+                state, onKeep = {}, onClose = {},
+                onPreviewColor = { _, look, _ -> previewed = look },
+                initialLook = Look.Preset(Filter.MONO),
+            )
+        }
+
+        rule.runOnIdle { assertEquals(Look.Preset(Filter.MONO), previewed) }
+    }
+
+    @Test
+    fun aSingleShotOnlyNeedsADoneButton() {
+        var closed = 0
+        val single = state.copy(items = state.items.take(1))
+        rule.setContent { ResultOverlay(single, onKeep = {}, onClose = { closed++ }) }
+
+        rule.onNodeWithText("베스트만 남기기").assertDoesNotExist()
+        fingerTap("완료")
+
+        rule.runOnIdle { assertEquals(1, closed) }
     }
 }

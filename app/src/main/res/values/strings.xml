@@ -88,6 +88,19 @@
 
     <string name="settings_debug_info">분석 정보 표시</string>
     <string name="settings_debug_info_desc">개발용: 분석 속도와 포즈 일치도를 화면 아래에 표시합니다</string>
+    <string name="look_title">필터</string>
+    <string name="review_done">완료</string>
+    <string name="look_original">원본</string>
+    <string name="filter_clear">맑음</string>
+    <string name="filter_cozy">포근</string>
+    <string name="filter_film">필름</string>
+    <string name="filter_sunset">노을</string>
+    <string name="filter_fresh">청량</string>
+    <string name="filter_night">밤거리</string>
+    <string name="filter_mono">흑백</string>
+    <string name="filter_vintage">빈티지</string>
+    <string name="cd_filter_current">필터: %1$s</string>
+    <string name="cd_filter_open">필터 고르기</string>
     <string name="cd_template_current">구도 틀: %1$s</string>
     <string name="cd_template_open">구도 틀 고르기</string>
     <string name="template_none">틀 없음</string>

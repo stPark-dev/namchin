@@ -64,6 +64,7 @@ import dev.stpark.namchin.capture.PhotoSaver
 import dev.stpark.namchin.core.tagging.Tag
 import dev.stpark.namchin.data.Reference
 import dev.stpark.namchin.ml.SceneEmbedder
+import dev.stpark.namchin.review.Look
 import dev.stpark.namchin.review.ReviewState
 import dev.stpark.namchin.review.ReviewViewModel
 import dev.stpark.namchin.settings.AppSettingsStore
@@ -204,8 +205,10 @@ private fun CameraContent(
             capturing = false
             when {
                 saved.isEmpty() -> message = R.string.camera_save_failed
-                // 여러 장이거나 레퍼런스 모드면 결과 화면 (베스트 컷·레퍼런스 색감)
-                (saved.size > 1 || reference != null) && screenActive.get() -> reviewVm.review(saved, reference)
+                // 여러 장·레퍼런스 모드·필터를 고른 때는 결과 화면 (베스트 컷 고르기, 색감·필터로 마무리).
+                // 필터 없이 한 장이면 바로 다음 장을 찍을 수 있게 저장만 알린다
+                (saved.size > 1 || reference != null || state.filter != null) && screenActive.get() ->
+                    reviewVm.review(saved, reference)
                 saved.size > 1 -> message = R.string.camera_saved_burst
                 else -> message = R.string.camera_saved
             }
@@ -295,9 +298,9 @@ private fun CameraContent(
             color = colorPreview,
             onPreviewColor = reviewVm::previewColor,
             onClearColor = reviewVm::clearColor,
-            onSaveColored = { id, strength, keepLightness ->
+            onSaveColored = { id, look, strength ->
                 message = R.string.color_saving
-                reviewVm.saveColored(id, strength, keepLightness) { ok ->
+                reviewVm.saveColored(id, look, strength) { ok ->
                     message = if (ok) R.string.color_saved else R.string.color_save_failed
                 }
             },
@@ -307,6 +310,7 @@ private fun CameraContent(
                 }
             },
             onClose = reviewVm::close,
+            initialLook = state.filter?.let(Look::Preset),
         )
         if (deckOpen) {
             CardDeck(

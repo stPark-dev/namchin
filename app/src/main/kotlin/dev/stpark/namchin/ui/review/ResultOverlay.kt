@@ -32,7 +32,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import dev.stpark.namchin.core.color.Filter
 import dev.stpark.namchin.review.ColorPreview
+import dev.stpark.namchin.review.Look
+import dev.stpark.namchin.ui.common.lookLabel
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,9 +80,11 @@ fun ResultOverlay(
     onKeep: (String) -> Unit,
     onClose: () -> Unit,
     color: ColorPreview? = null,
-    onPreviewColor: (String, Float, Boolean) -> Unit = { _, _, _ -> },
+    onPreviewColor: (String, Look, Float) -> Unit = { _, _, _ -> },
     onClearColor: () -> Unit = {},
-    onSaveColored: (String, Float, Boolean) -> Unit = { _, _, _ -> },
+    onSaveColored: (String, Look, Float) -> Unit = { _, _, _ -> },
+    /** 처음 골라 둘 색감 (카메라에서 고른 필터) */
+    initialLook: Look? = null,
 ) {
     if (state == ReviewState.Hidden) return
     Box(
@@ -101,7 +109,7 @@ fun ResultOverlay(
                 CircularProgressIndicator(color = Brand.Yellow)
                 Text(stringResource(R.string.review_analyzing), color = Color.White)
             }
-            is ReviewState.Ready -> ReadyContent(state, onKeep, onClose, color, onPreviewColor, onClearColor, onSaveColored)
+            is ReviewState.Ready -> ReadyContent(state, onKeep, onClose, color, onPreviewColor, onClearColor, onSaveColored, initialLook)
             ReviewState.Hidden -> Unit
         }
     }
@@ -113,24 +121,27 @@ private fun ReadyContent(
     onKeep: (String) -> Unit,
     onClose: () -> Unit,
     color: ColorPreview?,
-    onPreviewColor: (String, Float, Boolean) -> Unit,
+    onPreviewColor: (String, Look, Float) -> Unit,
     onClearColor: () -> Unit,
-    onSaveColored: (String, Float, Boolean) -> Unit,
+    onSaveColored: (String, Look, Float) -> Unit,
+    initialLook: Look?,
 ) {
     var selectedId by remember(state) { mutableStateOf((state.items.firstOrNull { it.best } ?: state.items.firstOrNull())?.id) }
     var compare by remember(state) { mutableStateOf(state.reference != null) }
     val selected = state.items.firstOrNull { it.id == selectedId } ?: state.items.firstOrNull() ?: return
     val reference = state.reference
-    var colorOn by remember(state) { mutableStateOf(false) }
-    var strength by remember(state) { mutableFloatStateOf(DEFAULT_STRENGTH) }
+    var look by remember(state) { mutableStateOf(initialLook?.takeIf { !it.needsReference || reference != null }) }
+    // 카메라에서 고른 필터는 촬영 때 본 그대로(100%)부터
+    var strength by remember(state) { mutableFloatStateOf(if (initialLook is Look.Preset) 1f else DEFAULT_STRENGTH) }
+    // 다른 필터를 갔다 와도 레퍼런스 색감의 밝기 유지 선택을 기억한다
     var keepLightness by remember(state) { mutableStateOf(false) }
-    // 색감 켜짐·강도·밝기 유지·선택 사진이 바뀌면 미리보기 다시 (뷰모델이 마지막 요청만 처리)
-    LaunchedEffect(colorOn, strength, keepLightness, selected.id) {
-        if (colorOn) onPreviewColor(selected.id, strength, keepLightness) else onClearColor()
+    // 색감·강도·선택 사진이 바뀌면 미리보기 다시 (뷰모델이 마지막 요청만 처리)
+    LaunchedEffect(look, strength, selected.id) {
+        look?.let { onPreviewColor(selected.id, it, strength) } ?: onClearColor()
     }
-    // 지금 선택한 사진·옵션의 색감 미리보기가 준비됐으면 그걸 보여준다
+    // 같은 사진의 색감 미리보기를 보여준다. 다른 필터로 바꾸는 중엔 새 미리보기가 올 때까지 앞의 것을 둔다 (원본이 번쩍이지 않게)
     val shown: Any = color
-        ?.takeIf { colorOn && it.shotId == selected.id && it.keepLightness == keepLightness }
+        ?.takeIf { look != null && it.shotId == selected.id }
         ?.bitmap?.asImageBitmap() ?: selected.id
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -168,23 +179,33 @@ private fun ReadyContent(
                 ShotImage(shown, Modifier.fillMaxSize().clip(SHAPE), ContentScale.Fit)
             }
         }
-        if (reference != null) {
-            ColorControls(
-                on = colorOn,
-                strength = strength,
-                keepLightness = keepLightness,
-                onToggle = { colorOn = it },
-                onStrength = { strength = it },
-                onKeepLightness = { keepLightness = it },
-                onSave = { onSaveColored(selected.id, strength, keepLightness) },
-            )
-        }
+        LookControls(
+            look = look,
+            hasReference = reference != null,
+            keepLightness = keepLightness,
+            strength = strength,
+            onLook = {
+                if (it is Look.Reference) keepLightness = it.keepLightness
+                look = it
+            },
+            onStrength = { strength = it },
+            onSave = { look?.let { onSaveColored(selected.id, it, strength) } },
+        )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.items, key = { it.id }) { item ->
                 Thumb(item, selected = item.id == selected.id) { selectedId = item.id }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (state.items.size == 1) {
+            // 한 장이면 고를 게 없으니 닫기만
+            Button(
+                onClick = onClose,
+                colors = ButtonDefaults.buttonColors(containerColor = Brand.Yellow, contentColor = Brand.Ink),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) {
+                Text(stringResource(R.string.review_done), fontWeight = FontWeight.SemiBold)
+            }
+        } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f).height(52.dp)) {
                 Text(stringResource(R.string.review_keep_all), color = Color.White)
             }
@@ -212,37 +233,58 @@ private fun ShotImage(model: Any, modifier: Modifier, scale: ContentScale) {
     }
 }
 
-/** 레퍼런스 색감: 켜기 · 강도 · 밝기 유지 · 새 파일로 저장 (원본 유지) */
+/**
+ * 색감 고르기: 원본 · 레퍼런스 색감(레퍼런스가 있을 때) · 앱 필터.
+ * 고르면 강도 슬라이더와 새 파일로 저장(원본 유지). 레퍼런스 색감은 밝기 유지도 고를 수 있다.
+ */
 @Composable
-private fun ColorControls(
-    on: Boolean,
-    strength: Float,
+private fun LookControls(
+    look: Look?,
+    hasReference: Boolean,
     keepLightness: Boolean,
-    onToggle: (Boolean) -> Unit,
+    strength: Float,
+    onLook: (Look?) -> Unit,
     onStrength: (Float) -> Unit,
-    onKeepLightness: (Boolean) -> Unit,
     onSave: () -> Unit,
 ) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Palette, null, tint = Brand.Yellow, modifier = Modifier.size(20.dp))
             Text(
-                stringResource(R.string.color_match),
+                stringResource(R.string.look_title),
                 color = Color.White,
                 modifier = Modifier.padding(start = 8.dp).weight(1f),
             )
-            if (on) {
+            if (look != null) {
                 TextButton(onClick = onSave) {
                     Text(stringResource(R.string.color_save), color = Brand.Yellow, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Switch(
-                checked = on,
-                onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(checkedTrackColor = Brand.Yellow, checkedThumbColor = Brand.Ink),
-            )
         }
-        if (on) {
+        val choices = buildList {
+            add(null)
+            if (hasReference) add(Look.Reference(keepLightness))
+            Filter.entries.forEach { add(Look.Preset(it)) }
+        }
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            choices.forEach { choice ->
+                val isSelected = lookKey(choice) == lookKey(look)
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onLook(choice) },
+                    label = { Text(stringResource(lookLabel(choice))) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        labelColor = Color.White,
+                        selectedContainerColor = Brand.Yellow,
+                        selectedLabelColor = Brand.Ink,
+                    ),
+                )
+            }
+        }
+        if (look != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Slider(
                     value = strength,
@@ -254,23 +296,32 @@ private fun ColorControls(
                     ),
                     modifier = Modifier.weight(1f),
                 )
-                // 어두운 레퍼런스여도 사진 밝기는 그대로, 색만 가져오기
-                FilterChip(
-                    selected = keepLightness,
-                    onClick = { onKeepLightness(!keepLightness) },
-                    label = { Text(stringResource(R.string.color_keep_lightness)) },
-                    leadingIcon = { Icon(Icons.Rounded.LightMode, null, Modifier.size(16.dp)) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        labelColor = Color.White,
-                        iconColor = Color.White,
-                        selectedContainerColor = Brand.Yellow,
-                        selectedLabelColor = Brand.Ink,
-                        selectedLeadingIconColor = Brand.Ink,
-                    ),
-                )
+                if (look is Look.Reference) {
+                    // 어두운 레퍼런스여도 사진 밝기는 그대로, 색만 가져오기
+                    FilterChip(
+                        selected = look.keepLightness,
+                        onClick = { onLook(look.copy(keepLightness = !look.keepLightness)) },
+                        label = { Text(stringResource(R.string.color_keep_lightness)) },
+                        leadingIcon = { Icon(Icons.Rounded.LightMode, null, Modifier.size(16.dp)) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            labelColor = Color.White,
+                            iconColor = Color.White,
+                            selectedContainerColor = Brand.Yellow,
+                            selectedLabelColor = Brand.Ink,
+                            selectedLeadingIconColor = Brand.Ink,
+                        ),
+                    )
+                }
             }
         }
     }
+}
+
+/** 밝기 유지 옵션이 달라도 같은 "레퍼런스 색감" 칩 */
+private fun lookKey(look: Look?): String = when (look) {
+    null -> "original"
+    is Look.Reference -> "reference"
+    is Look.Preset -> look.filter.name
 }
 
 private const val DEFAULT_STRENGTH = 0.8f

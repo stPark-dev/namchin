@@ -32,8 +32,8 @@ sealed interface ReviewState {
     data class Ready(val items: List<ReviewItem>, val reference: Reference?) : ReviewState
 }
 
-/** 레퍼런스 색감을 입힌 미리보기. */
-data class ColorPreview(val shotId: String, val strength: Float, val keepLightness: Boolean, val bitmap: Bitmap)
+/** 색감(레퍼런스 색감 또는 필터)을 입힌 미리보기. */
+data class ColorPreview(val shotId: String, val look: Look, val strength: Float, val bitmap: Bitmap)
 
 /** 연속 촬영 결과에서 베스트 컷을 고르고, 원하면 고른 한 장만 남기고 나머지를 갤러리에서 지운다. */
 class ReviewViewModel(app: Application) : AndroidViewModel(app) {
@@ -48,26 +48,27 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private var saveJob: Job? = null
 
     /**
-     * 사진·밝기 유지 여부별 색 변환표와 미리보기 바탕 (같은 사진에서 슬라이더만 움직이면 다시 만들지 않음).
+     * 색 변환표(Look.tableKey별)와 미리보기 바탕 (같은 사진에서 슬라이더만 움직이면 다시 만들지 않음).
      * 메인 스레드에서만 만지고, 무거운 계산은 Deferred로 백그라운드에서 한 번만 한다 (미리보기와 저장이 공유).
      */
-    private val luts = mutableMapOf<Pair<String, Boolean>, Deferred<ColorLut>>()
+    private val luts = mutableMapOf<Any, Deferred<ColorLut>>()
     private val previewBases = mutableMapOf<String, Deferred<Bitmap>>()
 
-    /** 선택한 사진에 레퍼런스 색감을 입힌 미리보기. 연달아 불리면 마지막 요청만 반영한다. */
-    fun previewColor(shotId: String, strength: Float, keepLightness: Boolean) {
-        val reference = (_state.value as? ReviewState.Ready)?.reference ?: return
+    /** 선택한 사진에 색감을 입힌 미리보기. 연달아 불리면 마지막 요청만 반영한다. */
+    fun previewColor(shotId: String, look: Look, strength: Float) {
+        val ready = _state.value as? ReviewState.Ready ?: return
+        if (look.needsReference && ready.reference == null) return
         colorJob?.cancel()
         colorJob = viewModelScope.launch {
             try {
-                val lut = lut(reference, shotId, keepLightness)
+                val lut = lut(ready.reference, shotId, look)
                 val base = cached(previewBases, shotId) {
                     BitmapLoader.load(getApplication(), Uri.parse(shotId), PREVIEW_DIMENSION)
                 }
                 val bitmap = withContext(Dispatchers.Default) { ColorMatcher.applied(base, lut, strength) }
                 // 메인으로 돌아온 뒤 확인하므로, 그사이 새 요청이 왔다면 옛 결과는 버려진다
                 ensureActive()
-                _color.value = ColorPreview(shotId, strength, keepLightness, bitmap)
+                _color.value = ColorPreview(shotId, look, strength, bitmap)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -82,12 +83,13 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 원본 해상도로 색감을 입혀 새 파일로 저장 (원본 유지). */
-    fun saveColored(shotId: String, strength: Float, keepLightness: Boolean, onDone: (Boolean) -> Unit) {
-        val reference = (_state.value as? ReviewState.Ready)?.reference ?: return
+    fun saveColored(shotId: String, look: Look, strength: Float, onDone: (Boolean) -> Unit) {
+        val ready = _state.value as? ReviewState.Ready ?: return
+        if (look.needsReference && ready.reference == null) return
         if (saveJob?.isActive == true) return
         saveJob = viewModelScope.launch {
             val ok = runCatching {
-                val lut = lut(reference, shotId, keepLightness)
+                val lut = lut(ready.reference, shotId, look)
                 withContext(Dispatchers.Default + NonCancellable) {
                     ColorMatcher.saveColored(getApplication(), Uri.parse(shotId), lut, strength)
                 }
@@ -96,9 +98,13 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun lut(reference: Reference, shotId: String, keepLightness: Boolean): ColorLut =
-        cached(luts, shotId to keepLightness) {
-            ColorMatcher.lut(getApplication(), reference, Uri.parse(shotId), keepLightness)
+    /** @param reference look이 레퍼런스 색감이면 null이 아니어야 한다 */
+    private suspend fun lut(reference: Reference?, shotId: String, look: Look): ColorLut =
+        cached(luts, look.tableKey(shotId)) {
+            when (look) {
+                is Look.Reference -> ColorMatcher.lut(getApplication(), requireNotNull(reference), Uri.parse(shotId), look.keepLightness)
+                is Look.Preset -> look.filter.lut()
+            }
         }
 
     /** 메인에서 캐시를 찾고, 없으면 백그라운드 계산을 하나만 띄워 공유한다. 실패한 계산은 캐시에서 뺀다. */
@@ -116,6 +122,9 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun clearColorCache() {
         clearColor()
+        // 화면을 닫았으면 아직 계산 중인 표·바탕도 멈춘다
+        luts.values.forEach { it.cancel() }
+        previewBases.values.forEach { it.cancel() }
         luts.clear()
         previewBases.clear()
     }
@@ -123,6 +132,14 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     fun review(uris: List<Uri>, reference: Reference?) {
         job?.cancel()
         clearColorCache()
+        // 한 장이면 고를 게 없으니 분석 없이 바로 (필터로 마무리만)
+        if (uris.size == 1) {
+            _state.value = ReviewState.Ready(
+                listOf(ReviewItem(uris[0].toString(), score = null, best = true, eyesClosed = false)),
+                reference,
+            )
+            return
+        }
         _state.value = ReviewState.Analyzing
         job = viewModelScope.launch {
             // 분석 모델은 이번 결과 화면 동안만 메모리에 둔다

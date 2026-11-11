@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import dev.stpark.namchin.R
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import dev.stpark.namchin.core.color.Filter
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -57,12 +59,20 @@ fun CameraPreview(
     onExposure: (Float) -> Unit,
     onCameraReady: (Camera, ImageCapture) -> Unit,
     modifier: Modifier = Modifier,
+    filter: Filter? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember {
-        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FIT_CENTER
+            // 필터 미리보기(RenderEffect)는 일반 View 그리기(TextureView)에만 입혀진다.
+            // 필터가 없어도 이 방식이라 SurfaceView보다 화면이 한 프레임쯤 늦을 수 있다 (실측 후 판단)
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
     }
+    val effect = remember(filter) { filter?.let(LiveFilter::effect) }
+    SideEffect { previewView.setRenderEffect(effect) }
     val currentOnFrame by rememberUpdatedState(onFrame)
     val currentOnScene by rememberUpdatedState(onScene)
     val currentOnExposure by rememberUpdatedState(onExposure)
