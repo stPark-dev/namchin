@@ -9,6 +9,9 @@ import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.graphics.Bitmap
 import android.util.Size
+import android.view.View
+import android.view.ViewGroup
+import androidx.core.view.children
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
@@ -72,7 +75,18 @@ fun CameraPreview(
         }
     }
     val effect = remember(filter) { filter?.let(LiveFilter::effect) }
-    SideEffect { previewView.setRenderEffect(effect) }
+    // 필터는 카메라 영상(안쪽 TextureView)에만 입힌다. PreviewView 전체에 입히면
+    // 바깥 검은 여백까지 물들어 그 위에 반투명하게 덮인 위아래 띠 색이 변한다.
+    // TextureView는 카메라가 붙을 때 새로 들어오므로, 들어올 때마다 다시 입힌다.
+    val currentEffect by rememberUpdatedState(effect)
+    DisposableEffect(previewView) {
+        previewView.setOnHierarchyChangeListener(object : ViewGroup.OnHierarchyChangeListener {
+            override fun onChildViewAdded(parent: View, child: View) = child.setRenderEffect(currentEffect)
+            override fun onChildViewRemoved(parent: View, child: View) = Unit
+        })
+        onDispose { previewView.setOnHierarchyChangeListener(null) }
+    }
+    SideEffect { previewView.children.forEach { it.setRenderEffect(effect) } }
     val currentOnFrame by rememberUpdatedState(onFrame)
     val currentOnScene by rememberUpdatedState(onScene)
     val currentOnExposure by rememberUpdatedState(onExposure)
