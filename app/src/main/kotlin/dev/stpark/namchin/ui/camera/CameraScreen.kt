@@ -298,15 +298,16 @@ private fun CameraContent(
             color = colorPreview,
             onPreviewColor = reviewVm::previewColor,
             onClearColor = reviewVm::clearColor,
-            onSaveColored = { id, look, strength ->
-                message = R.string.color_saving
-                reviewVm.saveColored(id, look, strength) { ok ->
-                    message = if (ok) R.string.color_saved else R.string.color_save_failed
-                }
-            },
-            onKeep = { id ->
-                reviewVm.keepOnly(id) { failed ->
-                    message = if (failed == 0) R.string.review_kept else R.string.review_keep_failed
+            onFinish = { keepId, look, strength ->
+                if (look != null) message = R.string.review_filtering
+                reviewVm.finish(keepId, look, strength) { result ->
+                    message = when {
+                        result.originalLost > 0 -> R.string.review_original_lost
+                        result.recolorFailed > 0 -> R.string.review_filter_failed
+                        result.deleteFailed > 0 -> R.string.review_keep_failed
+                        result.recolored > 0 -> R.string.review_filtered
+                        else -> R.string.review_kept
+                    }
                 }
             },
             onClose = reviewVm::close,

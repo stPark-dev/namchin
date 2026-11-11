@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 sealed interface ReviewState {
@@ -35,17 +37,17 @@ sealed interface ReviewState {
 /** 색감(레퍼런스 색감 또는 필터)을 입힌 미리보기. */
 data class ColorPreview(val shotId: String, val look: Look, val strength: Float, val bitmap: Bitmap)
 
-/** 연속 촬영 결과에서 베스트 컷을 고르고, 원하면 고른 한 장만 남기고 나머지를 갤러리에서 지운다. */
+/** 연속 촬영 결과에서 베스트 컷을 고르고, 원하면 고른 한 장만 남긴다. 고른 필터는 남는 사진에 입힌다. */
 class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow<ReviewState>(ReviewState.Hidden)
     val state: StateFlow<ReviewState> = _state.asStateFlow()
     private var job: Job? = null
-    private var deleteJob: Job? = null
+    /** 마치기는 한 번에 하나씩 (같은 사진을 동시에 덮어쓰지 않게) */
+    private val finishing = Mutex()
 
     private val _color = MutableStateFlow<ColorPreview?>(null)
     val color: StateFlow<ColorPreview?> = _color.asStateFlow()
     private var colorJob: Job? = null
-    private var saveJob: Job? = null
 
     /**
      * 색 변환표(Look.tableKey별)와 미리보기 바탕 (같은 사진에서 슬라이더만 움직이면 다시 만들지 않음).
@@ -82,30 +84,14 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
         _color.value = null
     }
 
-    /** 원본 해상도로 색감을 입혀 새 파일로 저장 (원본 유지). */
-    fun saveColored(shotId: String, look: Look, strength: Float, onDone: (Boolean) -> Unit) {
-        val ready = _state.value as? ReviewState.Ready ?: return
-        if (look.needsReference && ready.reference == null) return
-        if (saveJob?.isActive == true) return
-        saveJob = viewModelScope.launch {
-            val ok = runCatching {
-                val lut = lut(ready.reference, shotId, look)
-                withContext(Dispatchers.Default + NonCancellable) {
-                    ColorMatcher.saveColored(getApplication(), Uri.parse(shotId), lut, strength)
-                }
-            }.onFailure { if (it is CancellationException) throw it else Log.w(TAG, "색감 저장 실패", it) }.isSuccess
-            onDone(ok)
-        }
-    }
-
     /** @param reference look이 레퍼런스 색감이면 null이 아니어야 한다 */
     private suspend fun lut(reference: Reference?, shotId: String, look: Look): ColorLut =
-        cached(luts, look.tableKey(shotId)) {
-            when (look) {
-                is Look.Reference -> ColorMatcher.lut(getApplication(), requireNotNull(reference), Uri.parse(shotId), look.keepLightness)
-                is Look.Preset -> look.filter.lut()
-            }
-        }
+        cached(luts, look.tableKey(shotId)) { buildLut(reference, shotId, look) }
+
+    private fun buildLut(reference: Reference?, shotId: String, look: Look): ColorLut = when (look) {
+        is Look.Reference -> ColorMatcher.lut(getApplication(), requireNotNull(reference), Uri.parse(shotId), look.keepLightness)
+        is Look.Preset -> look.filter.lut()
+    }
 
     /** 메인에서 캐시를 찾고, 없으면 백그라운드 계산을 하나만 띄워 공유한다. 실패한 계산은 캐시에서 뺀다. */
     private suspend fun <K, V> cached(cache: MutableMap<K, Deferred<V>>, key: K, compute: () -> V): V {
@@ -161,26 +147,51 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * keepId 한 장만 남기고 나머지를 갤러리에서 지운다 (앱이 만든 사진이라 권한 없이 가능).
-     * 화면은 바로 닫고, 끝나면 지우지 못한 장 수를 알린다.
+     * 마친 뒤 알림.
+     * @property recolored 필터를 입힌 장 수
+     * @property originalLost 덮어쓰다 실패했는데 원본도 되돌리지 못한 장 수
      */
-    fun keepOnly(keepId: String, onDone: (failed: Int) -> Unit) {
+    data class FinishResult(val deleteFailed: Int, val recolorFailed: Int, val recolored: Int, val originalLost: Int)
+
+    /**
+     * 결과 화면 마치기: keepId가 있으면 그 한 장만 남기고 나머지는 갤러리에서 지운다 (앱이 만든 사진이라 권한 없이 가능).
+     * look을 골랐으면 남는 사진에 필터를 입혀 원본 자리에 덮어쓴다.
+     * 화면은 바로 닫고, 앞의 마치기가 아직 돌고 있으면 그 뒤에 차례로 한다. 할 일이 없으면 알리지 않는다.
+     */
+    fun finish(keepId: String?, look: Look?, strength: Float, onDone: (FinishResult) -> Unit) {
         val ready = _state.value as? ReviewState.Ready ?: return
-        if (deleteJob?.isActive == true) return
+        val usable = look?.takeIf { !it.needsReference || ready.reference != null }
+        val plan = FinishPlan.of(ready.items.map { it.id }, keepId, usable)
         _state.value = ReviewState.Hidden
         clearColorCache()
-        val targets = ready.items.map { it.id }.filter { it != keepId }
-        deleteJob = viewModelScope.launch {
-            val failed = withContext(Dispatchers.IO) {
-                targets.count { id ->
-                    val deleted = runCatching {
-                        getApplication<Application>().contentResolver.delete(Uri.parse(id), null, null)
-                    }.onFailure { Log.w(TAG, "삭제 실패: $id", it) }.getOrDefault(0)
-                    deleted != 1
-                }
+        if (plan.isEmpty) return
+        viewModelScope.launch {
+            // 화면을 떠나도 반쯤 하다 멈추지 않게
+            val result = withContext(Dispatchers.IO + NonCancellable) {
+                finishing.withLock { carryOut(plan, ready.reference, usable, strength) }
             }
-            onDone(failed)
+            onDone(result)
         }
+    }
+
+    private suspend fun carryOut(plan: FinishPlan, reference: Reference?, look: Look?, strength: Float): FinishResult {
+        val app = getApplication<Application>()
+        val deleteFailed = plan.delete.count { id ->
+            val deleted = runCatching { app.contentResolver.delete(Uri.parse(id), null, null) }
+                .onFailure { Log.w(TAG, "삭제 실패: $id", it) }.getOrDefault(0)
+            deleted != 1
+        }
+        val failures = plan.recolor.mapNotNull { id ->
+            runCatching {
+                ColorMatcher.overwriteColored(app, Uri.parse(id), buildLut(reference, id, requireNotNull(look)), strength)
+            }.onFailure { Log.w(TAG, "필터 입히기 실패: $id", it) }.exceptionOrNull()
+        }
+        return FinishResult(
+            deleteFailed = deleteFailed,
+            recolorFailed = failures.size,
+            recolored = plan.recolor.size - failures.size,
+            originalLost = failures.count { it is ColorMatcher.OriginalLostException },
+        )
     }
 
     fun close() {

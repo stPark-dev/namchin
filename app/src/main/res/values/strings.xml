@@ -146,11 +146,11 @@
     <string name="camera_night">야간 · 포즈 비교 꺼짐</string>
     <string name="peek_apply">이 레퍼런스 적용</string>
     <string name="color_match">레퍼런스 색감</string>
-    <string name="color_save">색감 입혀 저장</string>
     <string name="color_keep_lightness">밝기 유지</string>
-    <string name="color_saving">색감 입혀 저장 중…</string>
-    <string name="color_saved">색감 입힌 사진을 따로 저장했어요</string>
-    <string name="color_save_failed">색감 사진을 저장하지 못했어요</string>
+    <string name="review_filtering">필터 입히는 중…</string>
+    <string name="review_filtered">필터 입힌 사진만 남겼어요</string>
+    <string name="review_original_lost">사진을 저장하다 문제가 생겼어요. 갤러리에서 확인해 주세요</string>
+    <string name="review_filter_failed">일부 사진에 필터를 입히지 못해 원본으로 남았어요</string>
 
     <!-- 포즈 방향 안내: "[부위를] [동작] 달라고 하세요" -->
     <string name="guide_pose_directed">%1$s %2$s 달라고 하세요</string>

@@ -27,7 +27,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.graphics.ImageBitmap
@@ -77,12 +76,13 @@ private val SHAPE = RoundedCornerShape(14.dp)
 @Composable
 fun ResultOverlay(
     state: ReviewState,
-    onKeep: (String) -> Unit,
+    /** 마치기: keepId 한 장만 남기거나(null이면 모두), 고른 색감(look)을 남는 사진에 입힌다 */
+    onFinish: (keepId: String?, look: Look?, strength: Float) -> Unit,
+    /** 아무것도 바꾸지 않고 닫기 */
     onClose: () -> Unit,
     color: ColorPreview? = null,
     onPreviewColor: (String, Look, Float) -> Unit = { _, _, _ -> },
     onClearColor: () -> Unit = {},
-    onSaveColored: (String, Look, Float) -> Unit = { _, _, _ -> },
     /** 처음 골라 둘 색감 (카메라에서 고른 필터) */
     initialLook: Look? = null,
 ) {
@@ -109,7 +109,7 @@ fun ResultOverlay(
                 CircularProgressIndicator(color = Brand.Yellow)
                 Text(stringResource(R.string.review_analyzing), color = Color.White)
             }
-            is ReviewState.Ready -> ReadyContent(state, onKeep, onClose, color, onPreviewColor, onClearColor, onSaveColored, initialLook)
+            is ReviewState.Ready -> ReadyContent(state, onFinish, onClose, color, onPreviewColor, onClearColor, initialLook)
             ReviewState.Hidden -> Unit
         }
     }
@@ -118,12 +118,11 @@ fun ResultOverlay(
 @Composable
 private fun ReadyContent(
     state: ReviewState.Ready,
-    onKeep: (String) -> Unit,
+    onFinish: (keepId: String?, look: Look?, strength: Float) -> Unit,
     onClose: () -> Unit,
     color: ColorPreview?,
     onPreviewColor: (String, Look, Float) -> Unit,
     onClearColor: () -> Unit,
-    onSaveColored: (String, Look, Float) -> Unit,
     initialLook: Look?,
 ) {
     var selectedId by remember(state) { mutableStateOf((state.items.firstOrNull { it.best } ?: state.items.firstOrNull())?.id) }
@@ -153,7 +152,7 @@ private fun ReadyContent(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, null, tint = Color.White) }
+            IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, stringResource(R.string.cd_close), tint = Color.White) }
         }
         if (reference != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -189,7 +188,6 @@ private fun ReadyContent(
                 look = it
             },
             onStrength = { strength = it },
-            onSave = { look?.let { onSaveColored(selected.id, it, strength) } },
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.items, key = { it.id }) { item ->
@@ -197,21 +195,21 @@ private fun ReadyContent(
             }
         }
         if (state.items.size == 1) {
-            // 한 장이면 고를 게 없으니 닫기만
+            // 한 장이면 고를 게 없으니 (고른 필터만 입히고) 마치기
             Button(
-                onClick = onClose,
+                onClick = { onFinish(null, look, strength) },
                 colors = ButtonDefaults.buttonColors(containerColor = Brand.Yellow, contentColor = Brand.Ink),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) {
                 Text(stringResource(R.string.review_done), fontWeight = FontWeight.SemiBold)
             }
         } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f).height(52.dp)) {
+            OutlinedButton(onClick = { onFinish(null, look, strength) }, modifier = Modifier.weight(1f).height(52.dp)) {
                 Text(stringResource(R.string.review_keep_all), color = Color.White)
             }
             // 보고 있는 사진을 남긴다. 베스트가 아닌 걸 골랐으면 문구로 분명히
             Button(
-                onClick = { onKeep(selected.id) },
+                onClick = { onFinish(selected.id, look, strength) },
                 colors = ButtonDefaults.buttonColors(containerColor = Brand.Yellow, contentColor = Brand.Ink),
                 modifier = Modifier.weight(1f).height(52.dp),
             ) {
@@ -235,7 +233,7 @@ private fun ShotImage(model: Any, modifier: Modifier, scale: ContentScale) {
 
 /**
  * 색감 고르기: 원본 · 레퍼런스 색감(레퍼런스가 있을 때) · 앱 필터.
- * 고르면 강도 슬라이더와 새 파일로 저장(원본 유지). 레퍼런스 색감은 밝기 유지도 고를 수 있다.
+ * 고르면 강도 슬라이더. 고른 색감은 마칠 때 남는 사진에 입혀진다. 레퍼런스 색감은 밝기 유지도 고를 수 있다.
  */
 @Composable
 private fun LookControls(
@@ -245,7 +243,6 @@ private fun LookControls(
     strength: Float,
     onLook: (Look?) -> Unit,
     onStrength: (Float) -> Unit,
-    onSave: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -255,11 +252,6 @@ private fun LookControls(
                 color = Color.White,
                 modifier = Modifier.padding(start = 8.dp).weight(1f),
             )
-            if (look != null) {
-                TextButton(onClick = onSave) {
-                    Text(stringResource(R.string.color_save), color = Brand.Yellow, fontWeight = FontWeight.SemiBold)
-                }
-            }
         }
         val choices = buildList {
             add(null)

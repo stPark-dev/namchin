@@ -8,7 +8,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -47,18 +49,18 @@ class ResultOverlayTest {
 
     @Test
     fun keepAllRespondsToAFingerThatMovesSlightly() {
-        var closed = 0
-        rule.setContent { ResultOverlay(state, onKeep = {}, onClose = { closed++ }) }
+        var finished: Pair<String?, Look?>? = null
+        rule.setContent { ResultOverlay(state, onFinish = { id, look, _ -> finished = id to look }, onClose = {}) }
 
         fingerTap("모두 두기")
 
-        rule.runOnIdle { assertEquals(1, closed) }
+        rule.runOnIdle { assertEquals(null to null, finished) }
     }
 
     @Test
     fun keepBestRespondsToAFingerThatMovesSlightly() {
         var kept: String? = null
-        rule.setContent { ResultOverlay(state, onKeep = { kept = it }, onClose = {}) }
+        rule.setContent { ResultOverlay(state, onFinish = { id, _, _ -> kept = id }, onClose = {}) }
 
         fingerTap("베스트만 남기기")
 
@@ -70,7 +72,7 @@ class ResultOverlayTest {
         var cameraTapped = 0
         rule.setContent {
             Box(Modifier.fillMaxSize().clickable { cameraTapped++ })
-            ResultOverlay(state, onKeep = {}, onClose = {})
+            ResultOverlay(state, onFinish = { _, _, _ -> }, onClose = {})
         }
 
         fingerTap("베스트 컷")
@@ -83,7 +85,7 @@ class ResultOverlayTest {
         var zoomed = false
         rule.setContent {
             Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTransformGestures { _, _, zoom, _ -> if (zoom != 1f) zoomed = true } })
-            ResultOverlay(state, onKeep = {}, onClose = {})
+            ResultOverlay(state, onFinish = { _, _, _ -> }, onClose = {})
         }
 
         rule.onRoot().performTouchInput {
@@ -104,7 +106,7 @@ class ResultOverlayTest {
     fun filtersAreOfferedWithoutAReferenceAndPreviewWhenPicked() {
         var previewed: Look? = null
         rule.setContent {
-            ResultOverlay(state, onKeep = {}, onClose = {}, onPreviewColor = { _, look, _ -> previewed = look })
+            ResultOverlay(state, onFinish = { _, _, _ -> }, onClose = {}, onPreviewColor = { _, look, _ -> previewed = look })
         }
 
         rule.onNodeWithText("레퍼런스 색감").assertDoesNotExist()
@@ -118,7 +120,7 @@ class ResultOverlayTest {
         var previewed: Look? = null
         rule.setContent {
             ResultOverlay(
-                state, onKeep = {}, onClose = {},
+                state, onFinish = { _, _, _ -> }, onClose = {},
                 onPreviewColor = { _, look, _ -> previewed = look },
                 initialLook = Look.Preset(Filter.MONO),
             )
@@ -129,13 +131,56 @@ class ResultOverlayTest {
 
     @Test
     fun aSingleShotOnlyNeedsADoneButton() {
-        var closed = 0
+        var finished = 0
         val single = state.copy(items = state.items.take(1))
-        rule.setContent { ResultOverlay(single, onKeep = {}, onClose = { closed++ }) }
+        rule.setContent { ResultOverlay(single, onFinish = { _, _, _ -> finished++ }, onClose = {}) }
 
         rule.onNodeWithText("베스트만 남기기").assertDoesNotExist()
         fingerTap("완료")
 
-        rule.runOnIdle { assertEquals(1, closed) }
+        rule.runOnIdle { assertEquals(1, finished) }
+    }
+
+    @Test
+    fun theCameraFilterIsAppliedWhenDoneAtFullStrength() {
+        var finished: Triple<String?, Look?, Float>? = null
+        val single = state.copy(items = state.items.take(1))
+        rule.setContent {
+            ResultOverlay(
+                single, onFinish = { id, look, strength -> finished = Triple(id, look, strength) }, onClose = {},
+                initialLook = Look.Preset(Filter.MONO),
+            )
+        }
+
+        fingerTap("완료")
+
+        rule.runOnIdle { assertEquals(Triple(null, Look.Preset(Filter.MONO), 1f), finished) }
+    }
+
+    @Test
+    fun aFilterPickedHereIsAppliedToTheKeptShot() {
+        var finished: Pair<String?, Look?>? = null
+        rule.setContent { ResultOverlay(state, onFinish = { id, look, _ -> finished = id to look }, onClose = {}) }
+
+        fingerTap("필름")
+        fingerTap("베스트만 남기기")
+
+        rule.runOnIdle { assertEquals("content://shot/1" to Look.Preset(Filter.FILM), finished) }
+    }
+
+    @Test
+    fun closingChangesNothing() {
+        var finished = 0
+        var closed = 0
+        rule.setContent {
+            ResultOverlay(state, onFinish = { _, _, _ -> finished++ }, onClose = { closed++ }, initialLook = Look.Preset(Filter.MONO))
+        }
+
+        rule.onNodeWithContentDescription("닫기").performClick()
+
+        rule.runOnIdle {
+            assertEquals(0, finished)
+            assertEquals(1, closed)
+        }
     }
 }
