@@ -28,6 +28,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -37,6 +38,8 @@ import dev.stpark.namchin.review.Look
 import dev.stpark.namchin.ui.common.lookLabel
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -264,9 +267,18 @@ private fun LookControls(
         ) {
             choices.forEach { choice ->
                 val isSelected = lookKey(choice) == lookKey(look)
+                // 골라진 칩이 목록 밖에 있으면 보이는 곳까지 넘긴다 (카메라에서 고른 필터가 뒤쪽일 때)
+                val requester = remember { BringIntoViewRequester() }
+                LaunchedEffect(isSelected) {
+                    if (!isSelected) return@LaunchedEffect
+                    // 처음 열릴 땐 칩이 아직 배치 전이라, 한 프레임 그린 뒤에 넘긴다
+                    withFrameNanos { }
+                    requester.bringIntoView()
+                }
                 FilterChip(
                     selected = isSelected,
                     onClick = { onLook(choice) },
+                    modifier = Modifier.bringIntoViewRequester(requester),
                     label = { Text(stringResource(lookLabel(choice))) },
                     colors = FilterChipDefaults.filterChipColors(
                         labelColor = Color.White,

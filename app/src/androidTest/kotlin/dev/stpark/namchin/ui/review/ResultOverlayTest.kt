@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -127,6 +128,13 @@ class ResultOverlayTest {
         }
 
         rule.runOnIdle { assertEquals(Look.Preset(Filter.MONO), previewed) }
+    }
+
+    @Test
+    fun thePickedFilterIsScrolledIntoView() {
+        rule.setContent { ResultOverlay(state, onFinish = { _, _, _ -> }, onClose = {}, initialLook = Look.Preset(Filter.VINTAGE)) }
+
+        rule.onNodeWithText("빈티지").assertIsDisplayed()
     }
 
     @Test
