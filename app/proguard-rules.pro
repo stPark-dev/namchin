@@ -15,3 +15,11 @@
 # 크래시 기록에서 줄 번호를 볼 수 있게
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# ML Kit 내부(이미 난독화돼 배포됨)를 R8이 한 번 더 줄이면 사물 인식(라벨링) 생성 중 NPE로 앱이 꺼진다
+-keep class com.google.android.gms.internal.mlkit_vision_** { *; }
+-keep class com.google.mlkit.** { *; }
+
+# MediaPipe가 쓰는 Flogger는 호출 스택에서 자기 클래스 이름을 찾는다. 이름이 바뀌면 초기화 실패로 앱이 꺼진다
+-keep class com.google.common.flogger.** { *; }
+-dontwarn com.google.common.flogger.**
