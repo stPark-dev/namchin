@@ -83,10 +83,11 @@ fun ResultOverlay(
         Modifier
             .fillMaxSize()
             .background(Brand.Ink)
-            // 아래 카메라(셔터·줌)로 터치가 새지 않게 남은 이벤트를 모두 소비
+            // 터치를 받는 것만으로 아래 카메라(셔터·줌)로 새지 않는다.
+            // 소비(consume)까지 하면 손가락이 살짝만 움직여도 버튼이 누르기를 취소한다
             .pointerInput(Unit) {
                 awaitPointerEventScope {
-                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                    while (true) awaitPointerEvent()
                 }
             }
             .safeDrawingPadding(),

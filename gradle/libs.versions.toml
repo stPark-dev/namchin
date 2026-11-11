@@ -25,6 +25,10 @@ compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+# compose ui-test가 끌고 오는 3.5.0은 최신 안드로이드에서 입력 주입이 안 된다
+androidx-test-espresso = { module = "androidx.test.espresso:espresso-core", version = "3.7.0" }
 compose-material-icons = { module = "androidx.compose.material:material-icons-extended", version = "1.7.8" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
