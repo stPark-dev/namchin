@@ -15,6 +15,9 @@ sealed class Guidance(val priority: Int) {
     data class Level(val rotation: Rotation) : Guidance(1)
     data object MoveCloser : Guidance(2)
     data object MoveBack : Guidance(2)
+
+    /** 확대 촬영 설정인데 배율이 낮음 — 물러나서 ratio배로 당겨 찍기. 구도 전체가 바뀌므로 구도 안내보다 먼저. */
+    data class TeleZoom(val ratio: Float) : Guidance(1)
     data object TiltUp : Guidance(3)
     data object TiltDown : Guidance(3)
     data object PanLeft : Guidance(4)

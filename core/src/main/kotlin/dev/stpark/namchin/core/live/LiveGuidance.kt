@@ -22,6 +22,8 @@ import dev.stpark.namchin.core.shutter.ShutterState
  * @property autoShutter 자동 셔터 사용 여부
  * @property lowLight 어두움(야간): 골격 인식이 부정확하므로 포즈 비교와 자동 셔터를 끈다
  * @property shaky 손떨림. 어두울 때만 안내한다
+ * @property zoomRatio 지금 카메라 배율
+ * @property teleTarget 확대 촬영 설정 배율 (1이면 끔)
  */
 data class LiveInput(
     val reference: PersonPose,
@@ -32,6 +34,8 @@ data class LiveInput(
     val autoShutter: Boolean = false,
     val lowLight: Boolean = false,
     val shaky: Boolean = false,
+    val zoomRatio: Float = 1f,
+    val teleTarget: Float = 1f,
 )
 
 /** 프레임 사이에 이어지는 상태. */
@@ -77,10 +81,15 @@ object LiveGuidance {
         nowMs: Long,
         lowLight: Boolean = false,
         shaky: Boolean = false,
+        zoomRatio: Float = 1f,
+        teleTarget: Float = 1f,
     ): Pair<LiveState, LiveOutput> {
+        val tele = TeleShot.cue(zoomRatio, teleTarget, current != null)
+        // 배율을 바꾸면 구도가 통째로 바뀌므로, 그동안 잘림·여백 안내는 하지 않는다
+        val composition = if (tele != null) emptyList() else current?.let { CompositionAnalyzer.analyze(it, state.previousCues) }.orEmpty()
         val cues = holdSteady(lowLight, shaky) +
             listOfNotNull(rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) }) +
-            (current?.let { CompositionAnalyzer.analyze(it, state.previousCues) } ?: emptyList())
+            composition + listOfNotNull(tele)
         val decision = GuidancePrioritizer.decide(cues, state.guidance, nowMs)
         val nextState = state.copy(previousCues = cues, guidance = decision.state)
         return nextState to LiveOutput(decision.display, cues, decision.announce, aligned = false, match = null)
@@ -112,12 +121,16 @@ object LiveGuidance {
             })
         }
         // 인물이 없어도 수평은 미리 맞출 수 있게 함께 낸다
-        val cues = holdSteady(input.lowLight, input.shaky) +
-            if (framingCues == null) alignment.cues + listOfNotNull(levelCue) else alignment.cues
+        val tele = TeleShot.cue(input.zoomRatio, input.teleTarget, input.current != null)
+        val cues = TeleShot.withoutDistance(
+            holdSteady(input.lowLight, input.shaky) +
+                (if (framingCues == null) alignment.cues + listOfNotNull(levelCue) else alignment.cues) +
+                listOfNotNull(tele),
+        )
         val hasConstraint = referenceFrame != null || match != null
         val decision = GuidancePrioritizer.decide(cues, state.guidance, input.nowMs)
         // 야간엔 포즈를 비교하지 않으므로 "맞음"(초록·진동·'그대로 유지')을 내지 않는다
-        val aligned = alignment.aligned && hasConstraint && !input.lowLight
+        val aligned = alignment.aligned && hasConstraint && !input.lowLight && tele == null
         val shutter = AutoShutter.step(state.shutter, aligned, input.autoShutter && !input.lowLight, input.nowMs)
 
         val nextState = LiveState(

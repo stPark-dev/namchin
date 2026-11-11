@@ -38,6 +38,7 @@
     <string name="guide_level_ccw">폰을 반시계 방향으로 살짝 돌려 수평을 맞추세요</string>
     <string name="guide_move_closer">앞으로 다가가세요</string>
     <string name="guide_move_back">뒤로 물러나세요</string>
+    <string name="guide_tele_zoom">한 걸음 물러나서 %1$s배로 찍어요</string>
     <string name="guide_tilt_up">폰을 위로 살짝 기울이세요</string>
     <string name="guide_tilt_down">폰을 아래로 살짝 기울이세요</string>
     <string name="guide_pan_left">폰을 왼쪽으로 돌리세요</string>
@@ -87,6 +88,11 @@
 
     <string name="settings_debug_info">분석 정보 표시</string>
     <string name="settings_debug_info_desc">개발용: 분석 속도와 포즈 일치도를 화면 아래에 표시합니다</string>
+    <string name="settings_tele">확대 촬영</string>
+    <string name="settings_tele_desc">카메라를 켤 때 이 배율로 시작해요. 물러나서 당겨 찍으면 인물이 왜곡 없이 날씬하게 나와요</string>
+    <string name="settings_tele_off">끔</string>
+    <string name="settings_insta_ratio">인스타 4:5 비율</string>
+    <string name="settings_insta_ratio_desc">레퍼런스 없이 찍을 때 인스타그램 피드에 꽉 차는 4:5로 저장해요</string>
     <string name="cd_settings">설정</string>
     <string name="cd_back">뒤로</string>
     <string name="cd_voice">음성 안내</string>
@@ -151,6 +157,7 @@
     <string name="why_hold_steady">어두우면 셔터가 느려져서 조금만 흔들려도 사진이 번져요</string>
     <string name="why_no_person">어깨와 골반이 보여야 위치와 크기를 잴 수 있어요</string>
     <string name="why_level">수평이 기울면 사진 전체가 불안해 보여요</string>
+    <string name="why_tele_zoom">1배는 넓게 찍히는 렌즈라 가까이서 찍으면 얼굴과 몸이 왜곡돼요. 물러나서 당겨 찍으면 비율이 자연스럽고 배경도 정리돼요</string>
     <string name="why_distance">레퍼런스와 같은 크기로 담아야 같은 느낌이 나요</string>
     <string name="why_tilt">인물 높이가 레퍼런스와 같아야 구도가 맞아요</string>
     <string name="why_pan">인물 위치를 맞추면 배경 배치도 레퍼런스와 같아져요</string>

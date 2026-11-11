@@ -25,6 +25,7 @@ class GuidanceTextTest {
         Guidance.HeadCut,
         Guidance.FeetToBottom,
         Guidance.TooMuchHeadroom,
+        Guidance.TeleZoom(2f),
     ) + Guidance.CutPoint.entries.map { Guidance.CutAtJoint(it) } +
         Guidance.Side.entries.map { Guidance.GazeSpace(it) }
 
@@ -82,5 +83,11 @@ class GuidanceTextTest {
         // 화면 왼쪽 = 카메라를 보는 그녀의 오른쪽
         assertEquals(R.string.move_lean_her_right, GuidanceText.spec(Guidance.Pose(BodyPart.LEFT_TORSO, Direction.LEAN_LEFT)).args[1])
         assertEquals(R.string.move_lean_her_left, GuidanceText.spec(Guidance.Pose(BodyPart.LEFT_TORSO, Direction.LEAN_RIGHT)).args[1])
+    }
+
+    @Test
+    fun `tele cue names the zoom to use`() {
+        // 음성이 "×"를 "곱하기"로 읽지 않게 숫자만 ("3배로")
+        assertEquals(GuidanceText.TextSpec(R.string.guide_tele_zoom, listOf("3")), GuidanceText.spec(Guidance.TeleZoom(3f)))
     }
 }

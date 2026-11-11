@@ -72,6 +72,7 @@ internal fun Viewfinder(
         if (region != null && grid) GridOverlay(region, Modifier.fillMaxSize())
         if (region != null) {
             if (reference != null) StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
+            else OutsideDim(region, Modifier.fillMaxSize())
             LiveSkeleton(state.current, region, aligned, Modifier.fillMaxSize())
             ViewfinderCorners(region, aligned = aligned, Modifier.fillMaxSize())
         }

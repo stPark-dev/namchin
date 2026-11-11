@@ -112,6 +112,20 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    @Volatile private var zoomRatio = 1f
+    @Volatile private var teleTarget = 1f
+    @Volatile private var captureAspect: Float? = null
+
+    /**
+     * @param teleTarget 확대 촬영 설정 배율 (1이면 끔)
+     * @param captureAspect 레퍼런스가 없을 때 저장 비율 (가로/세로)
+     */
+    fun setCapture(zoomRatio: Float, teleTarget: Float, captureAspect: Float) {
+        this.zoomRatio = zoomRatio
+        this.teleTarget = teleTarget
+        this.captureAspect = captureAspect
+    }
+
     /** 카드 목록이 열려 있는 동안 등 자동 셔터를 잠시 멈춘다. */
     private var autoShutterPaused = false
     fun pauseAutoShutter(paused: Boolean) {
@@ -147,7 +161,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         val now = SystemClock.elapsedRealtime()
         val frameAspect = frame.width.toFloat() / frame.height
         // 같은 값이면 같은 인스턴스를 유지해 오버레이 정적 부분의 재구성을 건너뛰게 한다
-        val region = CropRegion.centerCrop(frameAspect, reference?.aspectRatio ?: frameAspect)
+        val region = CropRegion.centerCrop(frameAspect, reference?.aspectRatio ?: captureAspect ?: frameAspect)
             .let { if (it == snapshot.region) snapshot.region else it }
         val current = MlKitPoseMapper.toPersonPose(frame.landmarks, frame.width, frame.height)
             ?.let { CropRegion.remap(it, region) }
@@ -155,7 +169,9 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         val dark = lowLight.lowLight
         val refPose = reference?.pose
         val (next, output) = when {
-            reference == null -> LiveGuidance.stepBasic(live, current, snapshot.rollDegrees, now, dark, shake.shaky)
+            reference == null -> LiveGuidance.stepBasic(
+                live, current, snapshot.rollDegrees, now, dark, shake.shaky, zoomRatio = zoomRatio, teleTarget = teleTarget,
+            )
             refPose != null -> LiveGuidance.step(
                 live,
                 LiveInput(
@@ -163,6 +179,8 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
                     autoShutter = snapshot.settings.autoShutter && !autoShutterPaused,
                     lowLight = dark,
                     shaky = shake.shaky,
+                    zoomRatio = zoomRatio,
+                    teleTarget = teleTarget,
                 ),
             )
             else -> live to null

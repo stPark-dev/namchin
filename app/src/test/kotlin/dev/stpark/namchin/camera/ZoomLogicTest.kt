@@ -7,8 +7,8 @@ class ZoomLogicTest {
 
     @Test
     fun `presets outside the camera range are hidden`() {
-        assertEquals(listOf(0.6f, 1f, 3f, 10f), ZoomLogic.presets(min = 0.6f, max = 100f))
-        assertEquals(listOf(1f, 3f), ZoomLogic.presets(min = 1f, max = 8f))
+        assertEquals(listOf(0.6f, 1f, 2f, 3f, 10f), ZoomLogic.presets(min = 0.6f, max = 100f))
+        assertEquals(listOf(1f, 2f, 3f), ZoomLogic.presets(min = 1f, max = 8f))
     }
 
     @Test
@@ -32,5 +32,11 @@ class ZoomLogicTest {
         assertEquals("1×", ZoomLogic.label(1f))
         assertEquals("0.6×", ZoomLogic.label(0.6f))
         assertEquals("2.4×", ZoomLogic.label(2.43f))
+        assertEquals("2", ZoomLogic.number(2f))
+    }
+
+    @Test
+    fun `tele portrait choices are the 1x, 2x and 3x buttons`() {
+        assertEquals(listOf(1f, 2f, 3f), ZoomLogic.TELE_CHOICES)
     }
 }

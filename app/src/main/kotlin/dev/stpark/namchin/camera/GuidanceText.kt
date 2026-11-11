@@ -12,13 +12,14 @@ import dev.stpark.namchin.core.pose.PoseDirection.Direction
 
 /** 안내 → 화면/음성 문구와 "왜?" 설명. */
 object GuidanceText {
-    /** 문구 틀과, 틀에 끼울 다른 문자열 리소스들. */
-    data class TextSpec(@StringRes val res: Int, val args: List<Int> = emptyList())
+    /** 문구 틀과 틀에 끼울 값들. Int는 문자열 리소스로 바꾸므로, 숫자는 반드시 String으로 넣는다. */
+    data class TextSpec(@StringRes val res: Int, val args: List<Any> = emptyList())
 
     fun spec(cue: Guidance): TextSpec = when (cue) {
         is Guidance.Pose -> cue.direction
             ?.let { TextSpec(R.string.guide_pose_directed, listOf(partObject(cue.part, it), movement(it))) }
             ?: TextSpec(posePart(cue.part))
+        is Guidance.TeleZoom -> TextSpec(R.string.guide_tele_zoom, listOf(ZoomLogic.number(cue.ratio)))
         else -> TextSpec(framing(cue))
     }
 
@@ -37,18 +38,19 @@ object GuidanceText {
         Guidance.TooMuchHeadroom -> R.string.why_headroom
         is Guidance.CutAtJoint -> R.string.why_cut
         is Guidance.GazeSpace -> R.string.why_gaze
+        is Guidance.TeleZoom -> R.string.why_tele_zoom
     }
 
     @Composable
     fun text(cue: Guidance): String {
         val spec = spec(cue)
-        val args = spec.args.map { stringResource(it) }.toTypedArray<Any>()
+        val args = spec.args.map { if (it is Int) stringResource(it) else it }.toTypedArray()
         return stringResource(spec.res, *args)
     }
 
     fun text(context: Context, cue: Guidance): String {
         val spec = spec(cue)
-        return context.getString(spec.res, *spec.args.map { context.getString(it) }.toTypedArray<Any>())
+        return context.getString(spec.res, *spec.args.map { if (it is Int) context.getString(it) else it }.toTypedArray())
     }
 
     @StringRes
@@ -78,6 +80,7 @@ object GuidanceText {
             Guidance.Side.RIGHT -> R.string.guide_gaze_right
         }
         is Guidance.Pose -> posePart(cue.part)
+        is Guidance.TeleZoom -> R.string.guide_tele_zoom
     }
 
     /**

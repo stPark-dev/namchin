@@ -53,16 +53,7 @@ private fun InRegion(region: Region, modifier: Modifier = Modifier, content: @Co
 @Composable
 fun StaticGuide(reference: Reference, region: Region, ghostAlpha: Float, modifier: Modifier = Modifier) {
     Box(modifier) {
-        Canvas(Modifier.fillMaxSize()) {
-            val l = region.left * size.width
-            val t = region.top * size.height
-            val r = region.right * size.width
-            val b = region.bottom * size.height
-            drawRect(DIM, Offset.Zero, Size(size.width, t))
-            drawRect(DIM, Offset(0f, b), Size(size.width, size.height - b))
-            drawRect(DIM, Offset(0f, t), Size(l, b - t))
-            drawRect(DIM, Offset(r, t), Size(size.width - r, b - t))
-        }
+        OutsideDim(region, Modifier.fillMaxSize())
         InRegion(region, Modifier.fillMaxSize()) {
             AsyncImage(
                 model = File(reference.imagePath),
@@ -72,6 +63,21 @@ fun StaticGuide(reference: Reference, region: Region, ghostAlpha: Float, modifie
             )
             SkeletonOverlay(reference.pose, Modifier.fillMaxSize(), stroke = 3.dp, color = TARGET)
         }
+    }
+}
+
+/** 사진에 담기지 않는 바깥을 어둡게. */
+@Composable
+fun OutsideDim(region: Region, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val l = region.left * size.width
+        val t = region.top * size.height
+        val r = region.right * size.width
+        val b = region.bottom * size.height
+        drawRect(DIM, Offset.Zero, Size(size.width, t))
+        drawRect(DIM, Offset(0f, b), Size(size.width, size.height - b))
+        drawRect(DIM, Offset(0f, t), Size(l, b - t))
+        drawRect(DIM, Offset(r, t), Size(size.width - r, b - t))
     }
 }
 

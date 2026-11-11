@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraViewModel
+import dev.stpark.namchin.camera.CaptureAspect
 import dev.stpark.namchin.camera.CardOrder
 import dev.stpark.namchin.camera.ShutterGate
 import dev.stpark.namchin.camera.ZoomLogic
@@ -136,7 +138,9 @@ private fun CameraContent(
     var ghostAlpha by rememberSaveable { mutableFloatStateOf(0.35f) }
     var camera by remember { mutableStateOf<Camera?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
-    var zoomRatio by rememberSaveable { mutableFloatStateOf(1f) }
+    var zoomRatio by rememberSaveable { mutableFloatStateOf(appSettings.defaultZoom) }
+    // 설정에서 확대 촬영 배율을 바꾸고 돌아오면 그 배율로
+    var appliedDefaultZoom by rememberSaveable { mutableFloatStateOf(appSettings.defaultZoom) }
     var deckOpen by rememberSaveable { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
     var flash by remember { mutableStateOf(false) }
@@ -147,6 +151,18 @@ private fun CameraContent(
         zoomRatio = ratio.coerceIn(range.start, range.endInclusive)
         camera?.cameraControl?.setZoomRatio(zoomRatio)
     }
+
+    LaunchedEffect(appSettings.defaultZoom) {
+        if (appSettings.defaultZoom != appliedDefaultZoom) {
+            appliedDefaultZoom = appSettings.defaultZoom
+            zoomRatio = appSettings.defaultZoom
+            setZoom(zoomRatio)
+        }
+    }
+    val captureAspect = CaptureAspect.of(state.reference?.width, state.reference?.height, appSettings.instaRatio)
+    // 이 카메라가 못 당기는 배율이면 안내가 사라지지 않으므로 최대 배율까지만
+    val teleTarget = zoomRange?.let { appSettings.defaultZoom.coerceAtMost(it.endInclusive) } ?: appSettings.defaultZoom
+    SideEffect { vm.setCapture(zoomRatio, teleTarget, captureAspect.ratio) }
 
     // 목록이 로드된 뒤 고른 레퍼런스로 시작 (id가 같으면 목록이 갱신돼도 다시 시작하지 않음)
     val loaded = references != null
@@ -179,7 +195,7 @@ private fun CameraContent(
         val capture = imageCapture ?: return
         if (!ShutterGate.canShoot(referenceId, reference?.id, true, capturing)) return
         // 저장되는 사진도 화면의 밝은 영역(레퍼런스 비율)과 같게 자른다. 비율은 촬영 시점에 읽힌다
-        capture.setCropAspectRatio(reference?.let { Rational(it.width, it.height) } ?: Rational(3, 4))
+        capture.setCropAspectRatio(Rational(captureAspect.width, captureAspect.height))
         capturing = true
         flash = true
         vm.onShot()
@@ -234,6 +250,8 @@ private fun CameraContent(
                 onCameraReady = { cam, capture ->
                     camera = cam
                     imageCapture = capture
+                    // 저장된 배율이 이 카메라 범위 밖이면 범위 안으로 (실제 배율과 버튼 표시를 맞춤)
+                    cam.cameraInfo.zoomState.value?.let { zoomRatio = zoomRatio.coerceIn(it.minZoomRatio, it.maxZoomRatio) }
                     cam.cameraControl.setZoomRatio(zoomRatio)
                 },
                 flash = flash,

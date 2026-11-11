@@ -10,6 +10,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
@@ -24,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.stpark.namchin.R
+import dev.stpark.namchin.camera.ZoomLogic
 import dev.stpark.namchin.settings.AppSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +60,15 @@ fun SettingsScreen(settings: AppSettings, onChange: (AppSettings) -> Unit, onBac
                 onChange = { onChange(settings.copy(grid = it)) },
             )
             HorizontalDivider()
+            TeleRow(settings.defaultZoom) { onChange(settings.copy(defaultZoom = it)) }
+            HorizontalDivider()
+            SettingRow(
+                title = stringResource(R.string.settings_insta_ratio),
+                description = stringResource(R.string.settings_insta_ratio_desc),
+                checked = settings.instaRatio,
+                onChange = { onChange(settings.copy(instaRatio = it)) },
+            )
+            HorizontalDivider()
             SettingRow(
                 title = stringResource(R.string.settings_debug_info),
                 description = stringResource(R.string.settings_debug_info_desc),
@@ -81,5 +94,25 @@ private fun SettingRow(title: String, description: String, checked: Boolean, onC
         }
         // 행 전체가 토글이므로 스위치 자체는 입력을 받지 않는다
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** 확대 촬영: 끔(1배) / 2배 / 3배 중 하나. */
+@Composable
+private fun TeleRow(selected: Float, onSelect: (Float) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+        Text(stringResource(R.string.settings_tele), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_tele_desc), style = MaterialTheme.typography.bodySmall)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            ZoomLogic.TELE_CHOICES.forEachIndexed { i, ratio ->
+                SegmentedButton(
+                    selected = selected == ratio,
+                    onClick = { onSelect(ratio) },
+                    shape = SegmentedButtonDefaults.itemShape(i, ZoomLogic.TELE_CHOICES.size),
+                ) {
+                    Text(if (ratio == 1f) stringResource(R.string.settings_tele_off) else ZoomLogic.label(ratio))
+                }
+            }
+        }
     }
 }

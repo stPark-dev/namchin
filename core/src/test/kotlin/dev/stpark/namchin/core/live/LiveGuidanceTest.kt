@@ -8,6 +8,7 @@ import dev.stpark.namchin.core.shutter.AutoShutter
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.model.Point
 import dev.stpark.namchin.core.testutil.STANDING
+import dev.stpark.namchin.core.testutil.inFrame
 import dev.stpark.namchin.core.testutil.mirrored
 import dev.stpark.namchin.core.testutil.pose
 import dev.stpark.namchin.core.testutil.transformed
@@ -283,5 +284,34 @@ class LiveGuidanceTest {
             assertEquals(dev.stpark.namchin.core.pose.PoseDirection.Direction.RAISE, (it.display as Guidance.Pose).direction)
         }
         assertTrue(o3.announce is Guidance.Pose)
+    }
+
+    @Test
+    fun `basic mode asks to zoom for portraits when the tele setting is on`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), 0f, 0, zoomRatio = 1f, teleTarget = 2f)
+
+        assertEquals(Guidance.TeleZoom(2f), out.display)
+    }
+
+    @Test
+    fun `reference mode asks to zoom instead of walking closer`() {
+        val tooSmall = pose(rightArmRaised.transformed(scale = 0.5f, dx = 0.25f, dy = 0.15f))
+        val (_, out) = LiveGuidance.step(
+            LiveState(),
+            LiveInput(reference, tooSmall, 0f, true, 0, zoomRatio = 1f, teleTarget = 3f),
+        )
+
+        assertTrue(Guidance.TeleZoom(3f) in out.cues)
+        assertFalse(Guidance.MoveCloser in out.cues)
+        assertFalse(out.aligned)
+    }
+
+    @Test
+    fun `zoom cue wins over cut cues it would change anyway`() {
+        val tooClose = pose(STANDING.transformed(scale = 1.6f, dx = -0.3f, dy = -0.25f)).inFrame()
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), tooClose, 0f, 0, zoomRatio = 1f, teleTarget = 2f)
+
+        assertEquals(Guidance.TeleZoom(2f), out.display)
+        assertEquals(listOf<Guidance>(Guidance.TeleZoom(2f)), out.cues)
     }
 }
