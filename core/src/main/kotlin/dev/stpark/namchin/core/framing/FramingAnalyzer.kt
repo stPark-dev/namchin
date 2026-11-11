@@ -16,22 +16,25 @@ object FramingAnalyzer {
     /**
      * @param rollDegrees 폰이 시계 방향으로 기울어진 각도 (양수 = 시계 방향). null이면 수평은 안 본다
      * @param previous 직전 프레임의 안내
+     * @param sizeTolerance, positionTolerance 구도 틀처럼 대략적인 목표면 넓게
      */
     fun analyze(
         reference: PersonFrame,
         current: PersonFrame,
         rollDegrees: Float?,
         previous: Collection<Guidance> = emptyList(),
+        sizeTolerance: Float = SIZE_TOLERANCE,
+        positionTolerance: Float = POSITION_TOLERANCE,
     ): List<Guidance> {
         fun pick(value: Float, tolerance: Float, ifPositive: Guidance, ifNegative: Guidance) =
             pick(value, tolerance, ifPositive, ifNegative, previous)
         return listOfNotNull(
             rollDegrees?.let { levelCue(it, previous) },
-            sizeRatio(reference, current)?.let { pick(it - 1, SIZE_TOLERANCE, Guidance.MoveBack, Guidance.MoveCloser) },
+            sizeRatio(reference, current)?.let { pick(it - 1, sizeTolerance, Guidance.MoveBack, Guidance.MoveCloser) },
             // 인물이 화면 위쪽(음수)에 있으면 폰을 위로 기울여야 인물이 내려온다.
-            pick(current.anchorY - reference.anchorY, POSITION_TOLERANCE, Guidance.TiltDown, Guidance.TiltUp),
+            pick(current.anchorY - reference.anchorY, positionTolerance, Guidance.TiltDown, Guidance.TiltUp),
             // 인물이 화면 왼쪽(음수)에 있으면 폰을 왼쪽으로 돌려야 인물이 오른쪽으로 온다.
-            pick(current.anchorX - reference.anchorX, POSITION_TOLERANCE, Guidance.PanRight, Guidance.PanLeft),
+            pick(current.anchorX - reference.anchorX, positionTolerance, Guidance.PanRight, Guidance.PanLeft),
         )
     }
 

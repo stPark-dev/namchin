@@ -36,7 +36,7 @@ private val GRID = Color.White.copy(alpha = 0.6f)
 
 /** region 위치에 내용을 배치한다 (4:3 프리뷰 박스 기준). */
 @Composable
-private fun InRegion(region: Region, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun InRegion(region: Region, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     BoxWithConstraints(modifier) {
         Box(
             Modifier

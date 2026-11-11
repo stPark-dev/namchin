@@ -88,6 +88,13 @@
 
     <string name="settings_debug_info">분석 정보 표시</string>
     <string name="settings_debug_info_desc">개발용: 분석 속도와 포즈 일치도를 화면 아래에 표시합니다</string>
+    <string name="cd_template_current">구도 틀: %1$s</string>
+    <string name="cd_template_open">구도 틀 고르기</string>
+    <string name="template_none">틀 없음</string>
+    <string name="template_full_body">전신 다리 길게</string>
+    <string name="template_half_body">상반신</string>
+    <string name="template_side_third">인물 한쪽 + 배경</string>
+    <string name="template_horizon">수평선 + 인물</string>
     <string name="settings_tele">확대 촬영</string>
     <string name="settings_tele_desc">카메라를 켤 때 이 배율로 시작해요. 물러나서 당겨 찍으면 인물이 왜곡 없이 날씬하게 나와요</string>
     <string name="settings_tele_off">끔</string>

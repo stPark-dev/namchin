@@ -3,6 +3,8 @@ package dev.stpark.namchin.camera
 import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
+import dev.stpark.namchin.core.composition.CompositionTemplate
+import dev.stpark.namchin.core.guidance.Guidance
 import dev.stpark.namchin.core.live.CropRegion
 import dev.stpark.namchin.core.live.LiveGuidance
 import dev.stpark.namchin.core.live.LiveInput
@@ -50,6 +52,10 @@ data class CameraUiState(
     /** 개발용 표시: 화면 밝기, 카메라 감도×노출시간 */
     val brightness: Float = 0f,
     val exposure: Float? = null,
+    /** 레퍼런스 없이 고른 구도 틀 (레퍼런스가 있으면 쓰지 않음) */
+    val template: CompositionTemplate? = null,
+    /** 3분할 틀에서 인물을 둘 쪽 */
+    val templateSide: Guidance.Side? = null,
 )
 
 class CameraViewModel(app: Application) : AndroidViewModel(app) {
@@ -80,7 +86,12 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             settings = _state.value.settings,
             cardOrder = _state.value.cardOrder,
             lowLight = lowLight.lowLight,
+            template = _state.value.template,
         )
+    }
+
+    fun setTemplate(template: CompositionTemplate?) {
+        _state.update { it.copy(template = template) }
     }
 
     fun updateSettings(settings: FeedbackSettings) = _state.update { it.copy(settings = settings) }
@@ -171,6 +182,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         val (next, output) = when {
             reference == null -> LiveGuidance.stepBasic(
                 live, current, snapshot.rollDegrees, now, dark, shake.shaky, zoomRatio = zoomRatio, teleTarget = teleTarget,
+                template = snapshot.template,
             )
             refPose != null -> LiveGuidance.step(
                 live,
@@ -198,6 +210,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         _state.update {
             it.copy(
                 region = region,
+                templateSide = next.templateSide,
                 lowLight = dark,
                 brightness = frame.brightness,
                 exposure = exposure,

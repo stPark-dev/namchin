@@ -1,5 +1,6 @@
 package dev.stpark.namchin.core.live
 
+import dev.stpark.namchin.core.composition.CompositionTemplate
 import dev.stpark.namchin.core.guidance.Guidance
 import dev.stpark.namchin.core.guidance.GuidancePrioritizer.STABLE_MS
 import dev.stpark.namchin.core.guidance.Rotation
@@ -313,5 +314,48 @@ class LiveGuidanceTest {
 
         assertEquals(Guidance.TeleZoom(2f), out.display)
         assertEquals(listOf<Guidance>(Guidance.TeleZoom(2f)), out.cues)
+    }
+
+    @Test
+    fun `basic mode with a template coaches toward the template and turns green when it fits`() {
+        val small = pose(STANDING.transformed(scale = 0.6f, dx = 0.2f, dy = 0.31f))
+        val (_, far) = LiveGuidance.stepBasic(LiveState(), small, 0f, 0, template = CompositionTemplate.FULL_BODY)
+        val fits = pose(STANDING.transformed(scale = 1.17f, dx = -0.085f, dy = -0.10f))
+        val (_, ok) = LiveGuidance.stepBasic(LiveState(), fits, 0f, 0, template = CompositionTemplate.FULL_BODY)
+
+        assertTrue(Guidance.MoveCloser in far.cues)
+        assertFalse(far.aligned)
+        assertTrue(ok.aligned)
+    }
+
+    @Test
+    fun `a template fit survives a brief tracking dropout`() {
+        val fits = pose(STANDING.transformed(scale = 1.17f, dx = -0.085f, dy = -0.10f))
+        val (s1, _) = LiveGuidance.stepBasic(LiveState(), fits, 0f, 0, template = CompositionTemplate.FULL_BODY)
+        val (s2, dropout) = LiveGuidance.stepBasic(s1, null, 0f, 200, template = CompositionTemplate.FULL_BODY)
+        val (_, gone) = LiveGuidance.stepBasic(s2, null, 0f, 200 + LiveGuidance.FIT_GRACE_MS + 1, template = CompositionTemplate.FULL_BODY)
+
+        assertTrue(dropout.aligned)
+        assertFalse(gone.aligned)
+    }
+
+    @Test
+    fun `the chosen third carries over to the next frame`() {
+        fun at(x: Float) = pose(STANDING.transformed(scale = 0.6f, dx = x - 0.3f, dy = 0.31f))
+        val (s1, _) = LiveGuidance.stepBasic(LiveState(), at(0.4f), 0f, 0, template = CompositionTemplate.SIDE_THIRD)
+        val (s2, _) = LiveGuidance.stepBasic(s1, at(0.56f), 0f, 100, template = CompositionTemplate.SIDE_THIRD)
+
+        assertEquals(Guidance.Side.LEFT, s2.templateSide)
+    }
+
+    @Test
+    fun `while asking to zoom the template stays quiet and never turns green`() {
+        val fits = pose(STANDING.transformed(scale = 1.17f, dx = -0.085f, dy = -0.10f))
+        val (_, out) = LiveGuidance.stepBasic(
+            LiveState(), fits, 0f, 0, zoomRatio = 1f, teleTarget = 2f, template = CompositionTemplate.FULL_BODY,
+        )
+
+        assertEquals(listOf<Guidance>(Guidance.TeleZoom(2f)), out.cues)
+        assertFalse(out.aligned)
     }
 }

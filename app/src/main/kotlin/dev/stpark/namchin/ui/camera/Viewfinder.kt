@@ -4,13 +4,18 @@ import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.CameraUiState
 import dev.stpark.namchin.camera.ZoomLogic
@@ -52,6 +58,7 @@ internal fun Viewfinder(
     // 제스처 블록은 범위가 바뀔 때만 다시 시작하므로 콜백은 최신 것을 부른다.
     // 배율 계산은 부모가 실제 상태로 한다 (여기서 받은 zoom.ratio는 다음 화면 갱신 전까지 옛 값)
     val currentOnPinch by rememberUpdatedState(onPinch)
+    var pickerOpen by rememberSaveable { mutableStateOf(false) }
     Box(
         Modifier
             .fillMaxWidth()
@@ -73,6 +80,9 @@ internal fun Viewfinder(
         if (region != null) {
             if (reference != null) StaticGuide(reference, region, ghostAlpha, Modifier.fillMaxSize())
             else OutsideDim(region, Modifier.fillMaxSize())
+            if (reference == null && state.template != null) {
+                TemplateOverlay(state.template, state.templateSide, region, aligned, Modifier.fillMaxSize())
+            }
             LiveSkeleton(state.current, region, aligned, Modifier.fillMaxSize())
             ViewfinderCorners(region, aligned = aligned, Modifier.fillMaxSize())
         }
@@ -92,14 +102,29 @@ internal fun Viewfinder(
             onChange = vm::updateSettings,
             onGrid = onGrid,
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 10.dp),
+            templateLabel = if (reference == null) {
+                stringResource(R.string.cd_template_current, stringResource(templateLabel(state.template)))
+            } else {
+                null
+            },
+            templateActive = state.template != null,
+            onTemplate = { pickerOpen = !pickerOpen },
         )
-        zoom.range?.let { range ->
-            ZoomCapsule(
-                presets = ZoomLogic.presets(range.start, range.endInclusive),
-                current = zoom.ratio,
-                onSelect = onZoom,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
-            )
+        Column(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (reference == null && pickerOpen) {
+                TemplatePicker(state.template, onSelect = { vm.setTemplate(it); pickerOpen = false })
+            }
+            zoom.range?.let { range ->
+                ZoomCapsule(
+                    presets = ZoomLogic.presets(range.start, range.endInclusive),
+                    current = zoom.ratio,
+                    onSelect = onZoom,
+                )
+            }
         }
         if (flash) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.7f)))
         message?.let { Toast(stringResource(it), Modifier.align(Alignment.Center)) }

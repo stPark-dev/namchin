@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Grid3x3
 import androidx.compose.material.icons.rounded.GridOff
@@ -56,7 +57,7 @@ import dev.stpark.namchin.camera.ZoomLogic
 import dev.stpark.namchin.ui.theme.Brand
 
 /** 미리보기 위에 띄우는 반투명 유리 느낌 바탕. */
-private val Glass = Brand.Ink.copy(alpha = 0.55f)
+internal val Glass = Brand.Ink.copy(alpha = 0.55f)
 private val GlassBorder = Color.White.copy(alpha = 0.14f)
 
 /**
@@ -128,7 +129,11 @@ fun GuidanceCapsule(state: CameraUiState, modifier: Modifier = Modifier) {
     }
 }
 
-/** 오른쪽 세로 아이콘 줄: 음성·진동·자동 셔터·격자. 켜지면 노랑, 꺼지면 흐린 흰색. */
+/**
+ * 오른쪽 세로 아이콘 줄: 음성·진동·자동 셔터·격자·구도 틀. 켜지면 노랑, 꺼지면 흐린 흰색.
+ * @param templateLabel null이면 구도 틀 버튼을 숨긴다 (레퍼런스 사용 중). 아니면 지금 고른 틀 이름 (화면 읽기용)
+ * @param templateActive 틀을 골랐으면 노랑
+ */
 @Composable
 fun ControlRail(
     settings: FeedbackSettings,
@@ -137,6 +142,9 @@ fun ControlRail(
     onChange: (FeedbackSettings) -> Unit,
     onGrid: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    templateLabel: String? = null,
+    templateActive: Boolean = false,
+    onTemplate: () -> Unit = {},
 ) {
     Column(
         modifier
@@ -161,6 +169,23 @@ fun ControlRail(
             ) { onChange(settings.copy(autoShutter = it)) }
         }
         IconToggle(Icons.Rounded.Grid3x3, Icons.Rounded.GridOff, grid, stringResource(R.string.cd_grid), onGrid)
+        if (templateLabel != null) {
+            // 켜고 끄는 스위치가 아니라 고르기 줄을 여는 버튼. 색은 틀을 골랐는지 보여준다
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .clickable(role = Role.Button, onClickLabel = stringResource(R.string.cd_template_open), onClick = onTemplate)
+                    .semantics { contentDescription = templateLabel },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.AccessibilityNew, null,
+                    tint = if (templateActive) Brand.Yellow else Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
     }
 }
 
