@@ -109,6 +109,18 @@ class FilterRecipeTest {
     }
 
     @Test
+    fun `calm filter softens contrast and quiets the greens`() {
+        val calm = Filter.CALM.recipe
+        val leaf = argb(70, 150, 50)
+
+        assertTrue(r(calm.apply(argb(30, 30, 30))) > 30, "그림자가 들뜬다")
+        assertTrue(r(calm.apply(argb(235, 235, 235))) < 235, "밝은 곳이 눌린다")
+        val out = calm.apply(leaf)
+        assertTrue(g(out) - maxOf(r(out), b(out)) < g(leaf) - maxOf(r(leaf), b(leaf)), "초록이 덜 진하다")
+        assertTrue(distance(calm.apply(skin), skin) < distance(calm.copy(skinProtect = false).apply(skin), skin), "피부 보호")
+    }
+
+    @Test
     fun `filter table matches the recipe`() {
         val lut = Filter.FILM.lut()
         samples.forEach { c -> assertTrue(distance(lut.apply(c), Filter.FILM.recipe.apply(c)) <= 3, "$c") }

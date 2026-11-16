@@ -19,11 +19,12 @@ data class TemplateGuide(
     val shoulderHalfWidth: Float,
     val hipHalfWidth: Float,
     val lines: List<Line>,
+    val arcs: List<Arc> = emptyList(),
 ) {
     companion object {
         private const val HEAD_TOP_FACTOR = 0.7f
         private const val HEAD_RADIUS_PER_NECK = 0.5f
-        private const val ANKLE_PER_TORSO = 2.4f
+        private const val ANKLE_PER_TORSO = CompositionTemplate.FEET_PER_TORSO
         private const val SHOULDER_HALF_PER_TORSO = 0.3f
         private const val HIP_HALF_PER_TORSO = 0.22f
 
@@ -36,8 +37,11 @@ data class TemplateGuide(
             val lines = when (template) {
                 CompositionTemplate.FULL_BODY -> listOf(horizontal(CompositionTemplate.FEET_Y))
                 CompositionTemplate.HALF_BODY -> emptyList()
-                CompositionTemplate.SIDE_THIRD -> listOf(Line(t.anchorX, 0f, t.anchorX, 1f))
+                CompositionTemplate.SIDE_THIRD -> listOf(Line(t.anchorX, 0f, t.anchorX, 1f), horizontal(2f / 3))
                 CompositionTemplate.HORIZON_T -> listOf(horizontal(CompositionTemplate.HORIZON_Y), Line(0.5f, 0f, 0.5f, 1f))
+                CompositionTemplate.GOLDEN_SPIRAL -> emptyList()
+                CompositionTemplate.DIAGONAL_SPACE -> listOf(slope(side))
+                CompositionTemplate.LEADING_LINES -> converging()
             }
             return TemplateGuide(
                 centerX = t.anchorX,
@@ -50,9 +54,29 @@ data class TemplateGuide(
                 shoulderHalfWidth = torso * SHOULDER_HALF_PER_TORSO,
                 hipHalfWidth = torso * HIP_HALF_PER_TORSO,
                 lines = lines,
+                arcs = if (template == CompositionTemplate.GOLDEN_SPIRAL) GoldenSpiral.arcs(side) else emptyList(),
             )
         }
 
         private fun horizontal(y: Float) = Line(0f, y, 1f, y)
+
+        /** 인물 발밑을 지나 반대쪽으로 내려가는 비탈 */
+        private const val SLOPE_DROP = 0.2f
+
+        private fun slope(side: Side?): Line {
+            val feet = CompositionTemplate.SMALL_FEET_Y
+            val herX = CompositionTemplate.DIAGONAL_X
+            val nearEdge = feet - SLOPE_DROP * herX
+            val farEdge = nearEdge + SLOPE_DROP
+            return if (side == Side.RIGHT) Line(0f, farEdge, 1f, nearEdge) else Line(0f, nearEdge, 1f, farEdge)
+        }
+
+        /** 화면 아래 두 모서리에서 좁아지며 인물 발끝 양옆에 닿는 길 */
+        private const val PATH_HALF_WIDTH = 0.1f
+
+        private fun converging(): List<Line> {
+            val feet = CompositionTemplate.SMALL_FEET_Y
+            return listOf(Line(0f, 1f, 0.5f - PATH_HALF_WIDTH, feet), Line(1f, 1f, 0.5f + PATH_HALF_WIDTH, feet))
+        }
     }
 }

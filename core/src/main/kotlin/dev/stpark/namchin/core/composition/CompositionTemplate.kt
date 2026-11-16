@@ -18,21 +18,55 @@ enum class CompositionTemplate {
     /** 허리 위 상반신을 꽉 채움 — 인스타 4:5와 잘 맞는다 */
     HALF_BODY,
 
-    /** 작은 전신을 3분할 선 위에, 반대쪽은 배경 */
+    /** 작은 전신을 3분할 교차점에 (몸 가운데가 아래쪽 1/3 선), 반대쪽은 배경 */
     SIDE_THIRD,
 
     /** 수평선을 허리 높이에 두고 인물은 가운데 (T자) */
-    HORIZON_T;
+    HORIZON_T,
 
-    /** 인물이 있어야 할 자리. side는 SIDE_THIRD에서만 쓴다 */
+    /** 작은 전신을 황금 나선이 감겨 들어가는 점에 */
+    GOLDEN_SPIRAL,
+
+    /** 비스듬한 언덕·계단 선 위에 작게, 위쪽은 하늘로 크게 비운다 */
+    DIAGONAL_SPACE,
+
+    /** 길·난간처럼 화면 아래에서 모이는 선 끝에 작게 */
+    LEADING_LINES;
+
+    /** 왼쪽·오른쪽 중 인물에 가까운 쪽을 고르는 틀 */
+    val hasSide: Boolean get() = this == SIDE_THIRD || this == GOLDEN_SPIRAL || this == DIAGONAL_SPACE
+
+    /** 인물이 있어야 할 자리. side는 hasSide인 틀에서만 쓴다 */
     fun target(side: Side?): PersonFrame = when (this) {
         FULL_BODY -> PersonFrame(0.5f, 0.251f, torso = 0.2925f, neck = 0.117f)
         HALF_BODY -> PersonFrame(0.5f, 0.42f, torso = 0.5f, neck = 0.2f)
-        SIDE_THIRD -> PersonFrame(if (side == Side.RIGHT) 2f / 3 else 1f / 3, 0.49f, torso = 0.15f, neck = 0.06f)
+        SIDE_THIRD -> PersonFrame(if (side == Side.RIGHT) 2f / 3 else 1f / 3, 0.538f, torso = 0.15f, neck = 0.06f)
         HORIZON_T -> PersonFrame(0.5f, 0.55f, torso = 0.1375f, neck = 0.055f)
+        // 골반(몸 가운데)이 나선의 눈에 온다
+        GOLDEN_SPIRAL -> PersonFrame(onSide(1f - GoldenSpiral.EYE, side), GoldenSpiral.EYE - SMALL_TORSO, SMALL_TORSO, SMALL_NECK)
+        DIAGONAL_SPACE -> PersonFrame(onSide(DIAGONAL_X, side), SMALL_FEET_Y - TINY_TORSO * FEET_PER_TORSO, TINY_TORSO, TINY_NECK)
+        LEADING_LINES -> PersonFrame(0.5f, SMALL_FEET_Y - TINY_TORSO * FEET_PER_TORSO, TINY_TORSO, TINY_NECK)
     }
 
     companion object {
+        /** 몸통 대비 발목 높이 (정면 차렷) */
+        const val FEET_PER_TORSO = 2.4f
+
+        /** 대각선·모이는 길 틀에서 발끝이 닿는 높이 */
+        const val SMALL_FEET_Y = 0.72f
+
+        /** 대각선 틀에서 인물 자리 (왼쪽 기준) */
+        const val DIAGONAL_X = 0.25f
+
+        private const val SMALL_TORSO = 0.1f
+        private const val SMALL_NECK = 0.04f
+        // 더 작으면 골반 인식이 흔들려 맞음/안 맞음이 깜빡인다
+        private const val TINY_TORSO = 0.09f
+        private const val TINY_NECK = 0.036f
+
+        /** 왼쪽 기준 x를 고른 쪽으로 */
+        private fun onSide(leftX: Float, side: Side?) = if (side == Side.RIGHT) 1f - leftX else leftX
+
         /** 수평선 높이 (HORIZON_T) */
         const val HORIZON_Y = 0.6f
 
@@ -63,7 +97,7 @@ object TemplateCoach {
         previousCues: Collection<Guidance> = emptyList(),
     ): TemplateResult {
         val frame = pose?.let(PersonFrame::from) ?: return TemplateResult(emptyList(), previousSide, fits = false)
-        val side = if (template == CompositionTemplate.SIDE_THIRD) side(frame.anchorX, previousSide) else null
+        val side = if (template.hasSide) side(frame.anchorX, previousSide) else null
         val framing = FramingAnalyzer.analyze(
             template.target(side), frame, rollDegrees = null, previousCues, SIZE_TOLERANCE, POSITION_TOLERANCE,
         )
@@ -88,10 +122,9 @@ object TemplateCoach {
         null -> if (anchorX < 0.5f) Side.LEFT else Side.RIGHT
     }
 
-    /** 작은 전신을 배경 속에 두는 틀은 발끝·머리 위 여백 규칙과 반대, 3분할은 시선 여백 규칙과 부딪힌다 */
+    /** 작은 전신을 배경 속에 두는 틀은 발끝·머리 위 여백 규칙과 반대, 한쪽에 두는 틀은 시선 여백 규칙과 부딪힌다 */
     private fun conflicts(template: CompositionTemplate, cue: Guidance): Boolean = when (template) {
         CompositionTemplate.FULL_BODY, CompositionTemplate.HALF_BODY -> false
-        CompositionTemplate.SIDE_THIRD -> cue == Guidance.FeetToBottom || cue == Guidance.TooMuchHeadroom || cue is Guidance.GazeSpace
-        CompositionTemplate.HORIZON_T -> cue == Guidance.FeetToBottom || cue == Guidance.TooMuchHeadroom
+        else -> cue == Guidance.FeetToBottom || cue == Guidance.TooMuchHeadroom || (template.hasSide && cue is Guidance.GazeSpace)
     }
 }

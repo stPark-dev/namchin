@@ -94,6 +94,7 @@
     <string name="filter_clear">맑음</string>
     <string name="filter_cozy">포근</string>
     <string name="filter_film">필름</string>
+    <string name="filter_calm">잔잔</string>
     <string name="filter_sunset">노을</string>
     <string name="filter_fresh">청량</string>
     <string name="filter_night">밤거리</string>
@@ -108,6 +109,9 @@
     <string name="template_half_body">상반신</string>
     <string name="template_side_third">인물 한쪽 + 배경</string>
     <string name="template_horizon">수평선 + 인물</string>
+    <string name="template_golden_spiral">황금 나선</string>
+    <string name="template_diagonal">대각선 + 여백</string>
+    <string name="template_leading_lines">모이는 길</string>
     <string name="settings_tele">확대 촬영</string>
     <string name="settings_tele_desc">카메라를 켤 때 이 배율로 시작해요. 물러나서 당겨 찍으면 인물이 왜곡 없이 날씬하게 나와요</string>
     <string name="settings_tele_off">끔</string>

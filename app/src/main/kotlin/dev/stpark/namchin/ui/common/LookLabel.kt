@@ -18,6 +18,7 @@ fun filterLabel(filter: Filter): Int = when (filter) {
     Filter.CLEAR -> R.string.filter_clear
     Filter.COZY -> R.string.filter_cozy
     Filter.FILM -> R.string.filter_film
+    Filter.CALM -> R.string.filter_calm
     Filter.SUNSET -> R.string.filter_sunset
     Filter.FRESH -> R.string.filter_fresh
     Filter.NIGHT -> R.string.filter_night

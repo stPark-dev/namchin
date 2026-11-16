@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -56,6 +57,14 @@ fun TemplateOverlay(
                     color, Offset(line.x1 * size.width, line.y1 * size.height),
                     Offset(line.x2 * size.width, line.y2 * size.height),
                     strokeWidth = thin.width, pathEffect = dash,
+                )
+            }
+            guide.arcs.forEach { arc ->
+                drawArc(
+                    color, arc.startDegrees, arc.sweepDegrees, useCenter = false,
+                    topLeft = Offset(arc.left * size.width, arc.top * size.height),
+                    size = Size((arc.right - arc.left) * size.width, (arc.bottom - arc.top) * size.height),
+                    style = Stroke(width = thin.width),
                 )
             }
             // 높이 단위 크기 → 픽셀: 세로는 size.height 기준이므로 가로도 같은 값을 곱한다
@@ -118,6 +127,9 @@ fun templateLabel(template: CompositionTemplate?): Int = when (template) {
     CompositionTemplate.HALF_BODY -> R.string.template_half_body
     CompositionTemplate.SIDE_THIRD -> R.string.template_side_third
     CompositionTemplate.HORIZON_T -> R.string.template_horizon
+    CompositionTemplate.GOLDEN_SPIRAL -> R.string.template_golden_spiral
+    CompositionTemplate.DIAGONAL_SPACE -> R.string.template_diagonal
+    CompositionTemplate.LEADING_LINES -> R.string.template_leading_lines
 }
 
 /** 어깨 → 허리 → 두 다리로 이어지는 몸 윤곽 (머리 제외). */

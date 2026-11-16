@@ -133,6 +133,14 @@ enum class Filter(val recipe: FilterRecipe) {
         ),
     ),
 
+    /** 잔잔: 대비를 낮추고 초록·하늘을 살짝 바래게, 그림자는 올리브빛 */
+    CALM(
+        FilterRecipe(
+            contrast = -0.25f, saturation = -0.2f, warmth = 0.05f, fade = 0.25f,
+            shadowTint = Tint(0.02f, 0.03f, 0.01f), skinProtect = true,
+        ),
+    ),
+
     /** 노을: 주황·분홍 */
     SUNSET(
         FilterRecipe(
