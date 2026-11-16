@@ -1,6 +1,9 @@
 package dev.stpark.namchin.core.composition
 
+import dev.stpark.namchin.core.composition.CompositionTemplate.BOTTOM_CENTER
+import dev.stpark.namchin.core.composition.CompositionTemplate.CENTER
 import dev.stpark.namchin.core.composition.CompositionTemplate.DIAGONAL_SPACE
+import dev.stpark.namchin.core.composition.CompositionTemplate.FACE_THIRD
 import dev.stpark.namchin.core.composition.CompositionTemplate.FULL_BODY
 import dev.stpark.namchin.core.composition.CompositionTemplate.GOLDEN_SPIRAL
 import dev.stpark.namchin.core.composition.CompositionTemplate.HALF_BODY
@@ -9,6 +12,7 @@ import dev.stpark.namchin.core.composition.CompositionTemplate.LEADING_LINES
 import dev.stpark.namchin.core.composition.CompositionTemplate.SIDE_THIRD
 import dev.stpark.namchin.core.guidance.Guidance
 import dev.stpark.namchin.core.guidance.Guidance.Side
+import dev.stpark.namchin.core.model.Joint
 import dev.stpark.namchin.core.model.PersonPose
 import dev.stpark.namchin.core.testutil.STANDING
 import dev.stpark.namchin.core.testutil.inFrame
@@ -231,6 +235,112 @@ class CompositionTemplateTest {
             val result = TemplateCoach.analyze(template, at(t.anchorX, t.anchorY, t.torso!!), previousSide = Side.LEFT)
             assertFalse(Guidance.FeetToBottom in result.cues, "$template ${result.cues}")
             assertFalse(Guidance.TooMuchHeadroom in result.cues, "$template ${result.cues}")
+        }
+    }
+
+    // --- 기류 구도: 격자 중앙 · 얼굴을 위 교차점에 · 하단 중앙 + 여백 ---
+
+    /** 코와 정수리 높이 (STANDING 비율: 목 = 몸통 × 0.4, 정수리 = 코 - 목 × 0.7) */
+    private fun noseOf(p: PersonPose) = p.keypoints.getValue(Joint.NOSE).position
+    private fun headTopOf(guide: TemplateGuide) = guide.headTop
+
+    @Test
+    fun `center template wants her waist up in the middle with the head just under the upper line`() {
+        val guide = TemplateGuide.of(CENTER, null)
+
+        assertEquals(0.5f, guide.centerX, 1e-4f)
+        assertTrue(guide.headTop in 0.30f..0.36f, "정수리 ${guide.headTop}")
+        assertTrue(guide.hipY in 0.9f..1f, "허리 위 상반신 ${guide.hipY}")
+    }
+
+    @Test
+    fun `a person on the center spot fits without being told about headroom`() {
+        val t = CENTER.target(null)
+        val result = TemplateCoach.analyze(CENTER, at(t.anchorX, t.anchorY, t.torso!!))
+
+        assertTrue(result.cues.isEmpty(), "${result.cues}")
+        assertTrue(result.fits)
+    }
+
+    @Test
+    fun `face third puts her face on the nearer upper intersection`() {
+        for (side in Side.entries) {
+            val t = FACE_THIRD.target(side)
+            val her = at(t.anchorX, t.anchorY, t.torso!!)
+            val nose = noseOf(her)
+            val thirdX = if (side == Side.LEFT) 1f / 3 else 2f / 3
+
+            assertEquals(thirdX, nose.x, 0.01f)
+            assertEquals(1f / 3, nose.y, 0.01f)
+            val result = TemplateCoach.analyze(FACE_THIRD, her)
+            assertEquals(side, result.side)
+            assertTrue(result.fits, "$side ${result.cues}")
+        }
+    }
+
+    @Test
+    fun `face third marks the upper intersection`() {
+        val lines = TemplateGuide.of(FACE_THIRD, Side.RIGHT).lines
+
+        assertTrue(lines.any { it.x1 == 2f / 3 && it.x2 == 2f / 3 }, "세로 2/3 선")
+        assertTrue(lines.any { it.y1 == 1f / 3 && it.y2 == 1f / 3 }, "가로 1/3 선")
+    }
+
+    @Test
+    fun `bottom center keeps her small in the lower middle cell with space above`() {
+        val guide = TemplateGuide.of(BOTTOM_CENTER, null)
+
+        assertEquals(0.5f, guide.centerX, 1e-4f)
+        assertTrue(headTopOf(guide) in 0.62f..0.72f, "머리가 아래 가로선 근처 ${guide.headTop}")
+        assertTrue(guide.bottom in 0.92f..0.97f, "발끝이 화면 아래 ${guide.bottom}")
+        assertTrue(guide.lines.any { it.y1 == 2f / 3 && it.y2 == 2f / 3 }, "아래 가로선")
+    }
+
+    @Test
+    fun `a small person on the bottom center spot fits`() {
+        val t = BOTTOM_CENTER.target(null)
+        val result = TemplateCoach.analyze(BOTTOM_CENTER, at(t.anchorX, t.anchorY, t.torso!!))
+
+        assertTrue(result.cues.isEmpty(), "${result.cues}")
+    }
+
+    @Test
+    fun `a big close person on the bottom center spot is asked to step back`() {
+        val result = TemplateCoach.analyze(BOTTOM_CENTER, fullBody)
+
+        assertTrue(Guidance.MoveBack in result.cues, "${result.cues}")
+    }
+
+    /** 틀 크기 허용 범위(±15%)와 위치 허용 범위(±0.06) 전체에서 무릎·발목 잘림 안내가 나오지 않아야 맞출 수 있다 */
+    private fun assertNoJointCutAcrossTolerance(template: CompositionTemplate, side: Side?) {
+        val t = template.target(side)
+        for (scale in listOf(0.85f, 1f, 1.15f)) for (dy in listOf(-0.06f, 0f, 0.06f)) {
+            val her = at(t.anchorX, t.anchorY + dy, t.torso!! * scale)
+            val cues = TemplateCoach.analyze(template, her).cues
+            // 손목은 끝에서 "손까지 담아요"가 "물러서요"와 같은 방향이라 괜찮다 — 무릎·발목만 본다
+            val legCut = cues.any { it is Guidance.CutAtJoint && it.point != Guidance.CutPoint.WRIST }
+            assertFalse(legCut, "$template 크기×$scale 위치${dy}: $cues")
+        }
+    }
+
+    @Test
+    fun `center and face third never land the frame edge on a knee or ankle`() {
+        assertNoJointCutAcrossTolerance(CENTER, null)
+        assertNoJointCutAcrossTolerance(FACE_THIRD, Side.LEFT)
+        assertNoJointCutAcrossTolerance(FACE_THIRD, Side.RIGHT)
+    }
+
+    @Test
+    fun `centred templates still fit when she looks to the side`() {
+        for (template in listOf(CENTER, BOTTOM_CENTER)) {
+            val t = template.target(null)
+            val lookingRight = pose(
+                STANDING.transformed(t.torso!! / 0.25f, dx = t.anchorX - 0.5f * t.torso!! / 0.25f, dy = t.anchorY - 0.3f * t.torso!! / 0.25f)
+                    .let { m -> m + (Joint.NOSE to m.getValue(Joint.NOSE).let { dev.stpark.namchin.core.model.Point(it.x + 0.04f * t.torso!! / 0.25f, it.y) }) },
+            ).inFrame()
+
+            val result = TemplateCoach.analyze(template, lookingRight)
+            assertTrue(result.cues.none { it is Guidance.GazeSpace }, "$template ${result.cues}")
         }
     }
 }

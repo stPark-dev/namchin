@@ -1,5 +1,6 @@
 package dev.stpark.namchin.ui.camera
 
+import android.util.Log
 import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Rational
@@ -33,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInRoot
@@ -58,6 +61,7 @@ import dev.stpark.namchin.R
 import dev.stpark.namchin.camera.CameraViewModel
 import dev.stpark.namchin.camera.CaptureAspect
 import dev.stpark.namchin.camera.CardOrder
+import dev.stpark.namchin.camera.PortraitSupport
 import dev.stpark.namchin.camera.ShutterGate
 import dev.stpark.namchin.camera.ZoomLogic
 import dev.stpark.namchin.capture.PhotoSaver
@@ -139,6 +143,13 @@ private fun CameraContent(
     var ghostAlpha by rememberSaveable { mutableFloatStateOf(0.35f) }
     var camera by remember { mutableStateOf<Camera?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    // 인물사진: 이 폰이 배경 흐림을 지원하나 / 지금 배경 흐림 세션으로 연결할까 / 연결됐나 / 연결되면 찍을 차례인가
+    var portraitOffered by remember { mutableStateOf(false) }
+    var portraitSession by remember { mutableStateOf(false) }
+    var portraitActive by remember { mutableStateOf(false) }
+    // 배경 흐림 세션이 열리면 찍을 장수 (0 = 없음)
+    var pendingPortraitCount by remember { mutableIntStateOf(0) }
+    val portraitMode = PortraitSupport.use(appSettings.portrait, portraitOffered)
     var zoomRatio by rememberSaveable { mutableFloatStateOf(appSettings.defaultZoom) }
     // 설정에서 확대 촬영 배율을 바꾸고 돌아오면 그 배율로
     var appliedDefaultZoom by rememberSaveable { mutableFloatStateOf(appSettings.defaultZoom) }
@@ -149,7 +160,8 @@ private fun CameraContent(
     val zoomRange = camera?.cameraInfo?.zoomState?.value?.let { it.minZoomRatio..it.maxZoomRatio }
     fun setZoom(ratio: Float) {
         val range = zoomRange ?: return
-        zoomRatio = ratio.coerceIn(range.start, range.endInclusive)
+        // 인물사진 모드는 1·2·3배만 (삼성 인물사진과 같게, 미리보기 화각을 찍힐 사진과 맞춘다)
+        zoomRatio = (if (portraitMode) ZoomLogic.portraitZoom(ratio) else ratio).coerceIn(range.start, range.endInclusive)
         camera?.cameraControl?.setZoomRatio(zoomRatio)
     }
 
@@ -193,6 +205,15 @@ private fun CameraContent(
     val canShoot = ShutterGate.canShoot(referenceId, reference?.id, imageCapture != null, capturing)
     fun shoot(count: Int) {
         if (reviewing) return
+        if (PortraitSupport.switchBeforeShot(portraitMode, portraitActive)) {
+            // 배경 흐림 세션으로 바꾼 뒤 그 세션에서 한 장 찍는다 (아래 LaunchedEffect)
+            if (portraitSession || !ShutterGate.canShoot(referenceId, reference?.id, imageCapture != null, capturing)) return
+            capturing = true
+            pendingPortraitCount = count
+            portraitSession = true
+            message = if (count > 1) R.string.camera_portrait_switching_burst else R.string.camera_portrait_switching
+            return
+        }
         val capture = imageCapture ?: return
         if (!ShutterGate.canShoot(referenceId, reference?.id, true, capturing)) return
         // 저장되는 사진도 화면의 밝은 영역(레퍼런스 비율)과 같게 자른다. 비율은 촬영 시점에 읽힌다
@@ -203,6 +224,8 @@ private fun CameraContent(
         if (state.settings.vibrate) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         PhotoSaver.takeBurst(context, capture, count, appSettings.shutterSound, isActive = { screenActive.get() }) { saved ->
             capturing = false
+            // 배경 흐림으로 찍었으면 일반 카메라로 돌아가 코칭을 이어 간다
+            portraitSession = false
             when {
                 saved.isEmpty() -> message = R.string.camera_save_failed
                 // 여러 장·레퍼런스 모드·필터를 고른 때는 결과 화면 (베스트 컷 고르기, 색감·필터로 마무리).
@@ -215,14 +238,41 @@ private fun CameraContent(
         }
     }
 
+    // 인물사진을 켜면 배율을 1·2·3배 중 가까운 것으로
+    LaunchedEffect(portraitMode) { if (portraitMode) setZoom(zoomRatio) }
+    // 배경 흐림 세션이 연결되면 노출·초점이 잡힐 때까지 잠깐 기다렸다가 한 장 찍는다
+    LaunchedEffect(portraitActive, pendingPortraitCount) {
+        val count = pendingPortraitCount
+        if (portraitActive && count > 0) {
+            delay(PORTRAIT_SETTLE_MS)
+            Log.i("CameraScreen", "bokeh shot after ${PORTRAIT_SETTLE_MS}ms zoom=$zoomRatio")
+            pendingPortraitCount = 0
+            capturing = false
+            shoot(count)
+        }
+    }
+    // 세션이 끝내 안 열리면 포기하고 일반 카메라로
+    LaunchedEffect(pendingPortraitCount > 0) {
+        if (pendingPortraitCount > 0) {
+            delay(PORTRAIT_TIMEOUT_MS)
+            if (pendingPortraitCount > 0) {
+                pendingPortraitCount = 0
+                capturing = false
+                portraitSession = false
+                message = R.string.camera_portrait_failed
+            }
+        }
+    }
+
     FeedbackEffect(
         vm,
         voiceOn = state.settings.voice,
         canFire = canShoot && !deckOpen && !reviewing && !peek.active,
-        fire = { shoot(BURST_COUNT) },
+        fire = { shoot(appSettings.burstCount) },
     )
 
-    Box(Modifier.fillMaxSize()) {
+    // 폰을 거꾸로 들면(바닥에 렌즈를 붙이는 로우앵글) 화면 전체를 180° 돌려 그린다. 이 폰은 앱 화면을 돌려 주지 않는다
+    Box(Modifier.fillMaxSize().graphicsLayer { rotationZ = if (state.upsideDown) UPSIDE_DOWN_DEG else 0f }) {
         Column(Modifier.fillMaxSize()) {
             // 상단: 적용 중 레퍼런스(왼쪽), 설정(오른쪽). 안내 문구는 미리보기 위 캡슐로
             Row(
@@ -244,15 +294,37 @@ private fun CameraContent(
                 state = state,
                 grid = appSettings.grid,
                 ghostAlpha = ghostAlpha,
-                zoom = ZoomState(zoomRatio, zoomRange),
+                zoom = ZoomState(zoomRatio, zoomRange, portrait = portraitMode),
                 onZoom = ::setZoom,
                 onPinch = { scale ->
-                    zoomRange?.let { setZoom(ZoomLogic.pinch(zoomRatio, scale, it.start, it.endInclusive)) }
+                    // 인물사진 모드는 배율 버튼만 (핀치로 1·2·3배 사이를 오가면 렌즈가 바뀌며 끊긴다)
+                    if (!portraitMode) zoomRange?.let { setZoom(ZoomLogic.pinch(zoomRatio, scale, it.start, it.endInclusive)) }
                 },
                 onGrid = { settingsStore.update(appSettings.copy(grid = it)) },
+                portrait = appSettings.portrait.takeIf { portraitOffered },
+                onPortrait = { settingsStore.update(appSettings.copy(portrait = it)) },
+                portraitSession = portraitSession,
+                onPortraitOffered = { portraitOffered = it },
+                onPortraitActive = { portraitActive = it },
+                // 실패하면 꺼 둔다 (버튼이 숨어 끌 수 없게 되거나, 켤 때마다 다시 실패하지 않게)
+                onPortraitFailed = {
+                    settingsStore.update(settingsStore.settings.value.copy(portrait = false))
+                    if (pendingPortraitCount > 0) {
+                        pendingPortraitCount = 0
+                        capturing = false
+                        message = R.string.camera_portrait_failed
+                    }
+                    portraitSession = false
+                },
+                onUnbound = {
+                    camera = null
+                    imageCapture = null
+                },
                 onCameraReady = { cam, capture ->
                     camera = cam
                     imageCapture = capture
+                    // 확장(인물사진) 세션은 노출값을 안 줄 수 있어, 옛 값으로 야간에 굳지 않게 지운다
+                    vm.onCameraRebound()
                     // 저장된 배율이 이 카메라 범위 밖이면 범위 안으로 (실제 배율과 버튼 표시를 맞춤)
                     cam.cameraInfo.zoomState.value?.let { zoomRatio = zoomRatio.coerceIn(it.minZoomRatio, it.maxZoomRatio) }
                     cam.cameraControl.setZoomRatio(zoomRatio)
@@ -277,7 +349,7 @@ private fun CameraContent(
                 peek = peek,
                 peekDistancePx = peekDistancePx,
                 onShutter = { shoot(1) },
-                onLongShutter = { shoot(BURST_COUNT) },
+                onLongShutter = { shoot(appSettings.burstCount) },
                 onOpenLibrary = onOpenLibrary,
                 onExpandCards = { deckOpen = true },
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -335,5 +407,9 @@ private const val FLASH_MS = 80L
 private val CHIP_WIDTH = 64.dp
 private val CHIP_HEIGHT = 80.dp
 private val CHIP_CARD_INSET = 8.dp
-private const val BURST_COUNT = 3
+private const val UPSIDE_DOWN_DEG = 180f
+
+/** 배경 흐림 세션이 열린 뒤 노출·초점이 잡히길 기다리는 시간 */
+private const val PORTRAIT_SETTLE_MS = 1_500L
+private const val PORTRAIT_TIMEOUT_MS = 6_000L
 private const val MESSAGE_MS = 1_500L

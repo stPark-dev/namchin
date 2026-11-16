@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.BlurOff
+import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Grid3x3
 import androidx.compose.material.icons.rounded.GridOff
 import androidx.compose.material.icons.rounded.MobileOff
@@ -131,7 +133,8 @@ fun GuidanceCapsule(state: CameraUiState, modifier: Modifier = Modifier) {
 }
 
 /**
- * 오른쪽 세로 아이콘 줄: 음성·진동·자동 셔터·격자·구도 틀. 켜지면 노랑, 꺼지면 흐린 흰색.
+ * 오른쪽 세로 아이콘 줄: 음성·진동·자동 셔터·격자·인물사진·구도 틀. 켜지면 노랑, 꺼지면 흐린 흰색.
+ * @param portrait null이면 인물사진 버튼을 숨긴다 (이 폰이 지원하지 않음)
  * @param templateLabel null이면 구도 틀 버튼을 숨긴다 (레퍼런스 사용 중). 아니면 지금 고른 틀 이름 (화면 읽기용)
  * @param templateActive 틀을 골랐으면 노랑
  */
@@ -149,6 +152,8 @@ fun ControlRail(
     filterLabel: String = "",
     filterActive: Boolean = false,
     onFilter: () -> Unit = {},
+    portrait: Boolean? = null,
+    onPortrait: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier
@@ -173,6 +178,9 @@ fun ControlRail(
             ) { onChange(settings.copy(autoShutter = it)) }
         }
         IconToggle(Icons.Rounded.Grid3x3, Icons.Rounded.GridOff, grid, stringResource(R.string.cd_grid), onGrid)
+        if (portrait != null) {
+            IconToggle(Icons.Rounded.BlurOn, Icons.Rounded.BlurOff, portrait, stringResource(R.string.cd_portrait), onPortrait)
+        }
         if (templateLabel != null) {
             PickerButton(Icons.Rounded.AccessibilityNew, templateLabel, stringResource(R.string.cd_template_open), templateActive, onTemplate)
         }

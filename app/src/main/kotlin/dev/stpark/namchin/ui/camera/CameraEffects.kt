@@ -18,6 +18,7 @@ import dev.stpark.namchin.camera.GuideVoice
 import dev.stpark.namchin.camera.GuidanceText
 import dev.stpark.namchin.camera.Haptics
 import dev.stpark.namchin.camera.angularSpeed
+import dev.stpark.namchin.camera.pitchDegrees
 import dev.stpark.namchin.camera.tiltDegrees
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -54,6 +55,7 @@ internal fun SensorEffect(vm: CameraViewModel, context: Context = LocalContext.c
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             launch { angularSpeed(context).collect(vm::onGyro) }
+            launch { pitchDegrees(context).collect(vm::onPitch) }
             tiltDegrees(context).collect(vm::onTilt)
         }
     }

@@ -41,6 +41,20 @@ sealed class Guidance(val priority: Int) {
     /** 인물이 아래를 채우는데 머리 위가 많이 빔. */
     data object TooMuchHeadroom : Guidance(3)
 
+    /** 서 있는 전신인데 폰을 숙여 내려다봄 — 다리가 짧아 보임. 폰을 세워서. */
+    data object PhoneTiltedDown : Guidance(3)
+
+    /** 앉은 사람을 아래에서 올려다봄 — 폰을 얼굴보다 살짝 위로. */
+    data object ShootFromAbove : Guidance(3)
+
     /** 인물이 side 쪽을 보는데 그쪽 여백이 부족함. */
     data class GazeSpace(val side: Side) : Guidance(4)
+
+    // 한 번만 하는 한마디 (다른 안내가 없을 때만)
+
+    /** 얼굴이 화면보다 한참 어두움 (역광·그늘) — 빛 쪽으로 돌려 보기. */
+    data object FaceInShadow : Guidance(6)
+
+    /** 두 팔을 곧게 내린 차렷 자세 — 손을 얼굴·허리로 가져가 삼각형 만들기. */
+    data object TrianglePose : Guidance(7)
 }

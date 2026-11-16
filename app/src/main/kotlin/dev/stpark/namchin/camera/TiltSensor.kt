@@ -19,7 +19,12 @@ private const val MIN_CHANGE_DEG = 0.5f
  * 중력 센서 → 폰 좌우 기울기(도). 폰이 거의 누워 있으면 null.
  * 센서가 없으면 아무것도 내보내지 않는다.
  */
-fun tiltDegrees(context: Context): Flow<Float?> = callbackFlow {
+fun tiltDegrees(context: Context): Flow<Float?> = gravityDegrees(context) { x, y, _ -> DeviceTilt.rollDegrees(x, y) }
+
+/** 중력 센서 → 폰 앞뒤 기울기(도). 카메라가 아래를 보면 양수. */
+fun pitchDegrees(context: Context): Flow<Float?> = gravityDegrees(context) { x, y, z -> DeviceTilt.pitchDegrees(x, y, z) }
+
+private fun gravityDegrees(context: Context, angle: (Float, Float, Float) -> Float?): Flow<Float?> = callbackFlow {
     val manager = context.getSystemService(SensorManager::class.java)
     val sensor = manager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
     if (manager == null || sensor == null) {
@@ -28,7 +33,7 @@ fun tiltDegrees(context: Context): Flow<Float?> = callbackFlow {
     }
     val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
-            trySend(DeviceTilt.rollDegrees(event.values[0], event.values[1]))
+            trySend(angle(event.values[0], event.values[1], event.values[2]))
         }
 
         override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit

@@ -14,7 +14,14 @@ object ZoomLogic {
     /** 현재 배율이 버튼 배율과 이 비율 이내면 그 버튼을 선택된 것으로 본다. */
     private const val SELECT_TOLERANCE = 0.25f
 
-    fun presets(min: Float, max: Float): List<Float> = PRESETS.filter { it in min..max }
+    /** 인물사진(배경 흐림) 모드 배율. 삼성 인물사진처럼 1·2·3배만 (초광각 등에선 처리가 느려진다) */
+    val PORTRAIT_PRESETS = listOf(1f, 2f, 3f)
+
+    fun presets(min: Float, max: Float, portrait: Boolean = false): List<Float> =
+        (if (portrait) PORTRAIT_PRESETS else PRESETS).filter { it in min..max }
+
+    /** 인물사진 모드에서 쓸 배율: 1·2·3배 중 가장 가까운 것 */
+    fun portraitZoom(ratio: Float): Float = PORTRAIT_PRESETS.minBy { abs(it - ratio) }
 
     fun pinch(current: Float, scale: Float, min: Float, max: Float): Float = (current * scale).coerceIn(min, max)
 

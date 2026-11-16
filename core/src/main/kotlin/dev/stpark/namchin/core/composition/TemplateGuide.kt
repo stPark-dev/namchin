@@ -42,6 +42,10 @@ data class TemplateGuide(
                 CompositionTemplate.GOLDEN_SPIRAL -> emptyList()
                 CompositionTemplate.DIAGONAL_SPACE -> listOf(slope(side))
                 CompositionTemplate.LEADING_LINES -> converging()
+                CompositionTemplate.CENTER -> listOf(horizontal(1f / 3), vertical(1f / 3), vertical(2f / 3))
+                CompositionTemplate.FACE_THIRD -> listOf(horizontal(1f / 3), vertical(t.anchorX))
+                CompositionTemplate.BOTTOM_CENTER ->
+                    listOf(horizontal(2f / 3), Line(1f / 3, 2f / 3, 1f / 3, 1f), Line(2f / 3, 2f / 3, 2f / 3, 1f))
             }
             return TemplateGuide(
                 centerX = t.anchorX,
@@ -59,6 +63,8 @@ data class TemplateGuide(
         }
 
         private fun horizontal(y: Float) = Line(0f, y, 1f, y)
+
+        private fun vertical(x: Float) = Line(x, 0f, x, 1f)
 
         /** 인물 발밑을 지나 반대쪽으로 내려가는 비탈 */
         private const val SLOPE_DROP = 0.2f

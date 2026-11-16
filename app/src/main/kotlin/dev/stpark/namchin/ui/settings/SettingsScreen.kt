@@ -62,6 +62,8 @@ fun SettingsScreen(settings: AppSettings, onChange: (AppSettings) -> Unit, onBac
             HorizontalDivider()
             TeleRow(settings.defaultZoom) { onChange(settings.copy(defaultZoom = it)) }
             HorizontalDivider()
+            BurstRow(settings.burstCount) { onChange(settings.copy(burstCount = it)) }
+            HorizontalDivider()
             SettingRow(
                 title = stringResource(R.string.settings_insta_ratio),
                 description = stringResource(R.string.settings_insta_ratio_desc),
@@ -98,6 +100,25 @@ private fun SettingRow(title: String, description: String, checked: Boolean, onC
 }
 
 /** 확대 촬영: 끔(1배) / 2배 / 3배 중 하나. */
+@Composable
+private fun BurstRow(selected: Int, onSelect: (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+        Text(stringResource(R.string.settings_burst), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_burst_desc), style = MaterialTheme.typography.bodySmall)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            AppSettings.BURST_CHOICES.forEachIndexed { i, count ->
+                SegmentedButton(
+                    selected = selected == count,
+                    onClick = { onSelect(count) },
+                    shape = SegmentedButtonDefaults.itemShape(i, AppSettings.BURST_CHOICES.size),
+                ) {
+                    Text(stringResource(R.string.settings_burst_count, count))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun TeleRow(selected: Float, onSelect: (Float) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {

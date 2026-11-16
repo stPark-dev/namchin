@@ -7,6 +7,7 @@ import dev.stpark.namchin.core.color.Filter
 import dev.stpark.namchin.core.composition.CompositionTemplate
 import dev.stpark.namchin.core.guidance.Guidance
 import dev.stpark.namchin.core.live.CropRegion
+import dev.stpark.namchin.core.live.DeviceTilt
 import dev.stpark.namchin.core.live.LiveGuidance
 import dev.stpark.namchin.core.live.LiveInput
 import dev.stpark.namchin.core.live.LiveOutput
@@ -42,7 +43,12 @@ data class CameraUiState(
     val region: Region? = null,
     val current: PersonPose? = null,
     val output: LiveOutput? = null,
+    /** 화면 기준 좌우 기울기 (거꾸로 들면 앱 화면도 뒤집어 그리므로 그 기준) */
     val rollDegrees: Float? = null,
+    /** 폰을 거꾸로 들었나 (렌즈를 바닥에 붙이는 로우앵글). 앱 화면을 180° 돌려 그린다 */
+    val upsideDown: Boolean = false,
+    /** 폰 앞뒤 기울기 (카메라가 아래를 보면 양수) */
+    val pitchDegrees: Float? = null,
     val analysisMs: Long = 0,
     val fps: Float = 0f,
     val settings: FeedbackSettings = FeedbackSettings(),
@@ -159,7 +165,16 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         live = LiveGuidance.afterManualShot(live, SystemClock.elapsedRealtime())
     }
 
-    fun onTilt(degrees: Float?) = _state.update { it.copy(rollDegrees = degrees) }
+    /** @param deviceRoll 기기 기준 좌우 기울기 */
+    fun onTilt(deviceRoll: Float?) = _state.update {
+        val upsideDown = DeviceTilt.upsideDown(deviceRoll, it.upsideDown)
+        it.copy(
+            upsideDown = upsideDown,
+            rollDegrees = deviceRoll?.let { roll -> DeviceTilt.onScreen(roll, if (upsideDown) UPSIDE_DOWN_DEG else 0) },
+        )
+    }
+
+    fun onPitch(degrees: Float?) = _state.update { it.copy(pitchDegrees = degrees) }
 
     fun onGyro(sample: GyroSample) {
         shake = Shake.step(shake, sample.speed, sample.timeMs)
@@ -167,6 +182,11 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 카메라가 실제로 쓰는 ISO × 노출 시간(초). 카메라 스레드에서 들어온다. */
     @Volatile private var exposure: Float? = null
+
+    /** 카메라를 새로 연결함: 이전 연결의 노출값을 버린다 (새 세션이 노출값을 안 주면 야간 판정이 옛 값에 굳는다) */
+    fun onCameraRebound() {
+        exposure = null
+    }
 
     fun onExposure(isoTimesSeconds: Float) {
         exposure = isoTimesSeconds
@@ -189,6 +209,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
             reference == null -> LiveGuidance.stepBasic(
                 live, current, snapshot.rollDegrees, now, dark, shake.shaky, zoomRatio = zoomRatio, teleTarget = teleTarget,
                 template = snapshot.template,
+                faceLuma = frame.faceBrightness, frameLuma = frame.brightness, pitchDegrees = snapshot.pitchDegrees,
             )
             refPose != null -> LiveGuidance.step(
                 live,
@@ -233,6 +254,7 @@ class CameraViewModel(app: Application) : AndroidViewModel(app) {
         @OptIn(ExperimentalCoroutinesApi::class)
         val sceneDispatcher = Dispatchers.Default.limitedParallelism(1)
         const val FPS_SMOOTHING = 0.9f
+        const val UPSIDE_DOWN_DEG = 180
         const val FEEDBACK_BUFFER = 8
     }
 }

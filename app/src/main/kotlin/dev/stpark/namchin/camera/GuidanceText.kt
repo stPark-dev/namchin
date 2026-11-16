@@ -38,6 +38,10 @@ object GuidanceText {
         Guidance.TooMuchHeadroom -> R.string.why_headroom
         is Guidance.CutAtJoint -> R.string.why_cut
         is Guidance.GazeSpace -> R.string.why_gaze
+        Guidance.PhoneTiltedDown -> R.string.why_phone_tilted_down
+        Guidance.ShootFromAbove -> R.string.why_shoot_from_above
+        Guidance.FaceInShadow -> R.string.why_face_shadow
+        Guidance.TrianglePose -> R.string.why_triangle_pose
         is Guidance.TeleZoom -> R.string.why_tele_zoom
     }
 
@@ -81,6 +85,10 @@ object GuidanceText {
         }
         is Guidance.Pose -> posePart(cue.part)
         is Guidance.TeleZoom -> R.string.guide_tele_zoom
+        Guidance.PhoneTiltedDown -> R.string.guide_phone_tilted_down
+        Guidance.ShootFromAbove -> R.string.guide_shoot_from_above
+        Guidance.FaceInShadow -> R.string.guide_face_shadow
+        Guidance.TrianglePose -> R.string.guide_triangle_pose
     }
 
     /**

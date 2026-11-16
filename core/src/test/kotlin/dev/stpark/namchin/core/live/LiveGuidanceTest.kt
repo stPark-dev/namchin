@@ -358,4 +358,140 @@ class LiveGuidanceTest {
         assertEquals(listOf<Guidance>(Guidance.TeleZoom(2f)), out.cues)
         assertFalse(out.aligned)
     }
+
+    // --- 한 번만 하는 한마디: 삼각형 포즈 · 얼굴 빛 ---
+
+    /** 같은 입력을 0ms부터 untilMs까지 100ms 간격으로 넣고 마지막 출력. */
+    private fun basicOver(
+        current: PersonPose?,
+        untilMs: Long,
+        roll: Float = 0f,
+        lowLight: Boolean = false,
+        faceLuma: Float? = null,
+        frameLuma: Float? = null,
+        template: CompositionTemplate? = null,
+    ): LiveOutput = (0..untilMs step 100).fold(LiveState() to (null as LiveOutput?)) { (s, _), now ->
+        LiveGuidance.stepBasic(
+            s, current, roll, now, lowLight = lowLight, faceLuma = faceLuma, frameLuma = frameLuma, template = template,
+        ).let { (next, out) -> next to out }
+    }.second!!
+
+    private val handOnHip = STANDING.with(Joint.RIGHT_ELBOW to Point(0.37f, 0.42f), Joint.RIGHT_WRIST to Point(0.46f, 0.53f))
+
+    @Test
+    fun `stiff arms get a triangle pose tip once they last`() {
+        val out = basicOver(pose(STANDING), OneShotHint.DELAY_MS + STABLE_MS)
+
+        assertEquals(Guidance.TrianglePose, out.display)
+        assertEquals(Guidance.TrianglePose, out.announce)
+    }
+
+    @Test
+    fun `a triangle pose needs no tip`() {
+        assertNull(basicOver(pose(handOnHip), OneShotHint.DELAY_MS + STABLE_MS).display)
+    }
+
+    @Test
+    fun `tips wait while other guidance is showing`() {
+        val out = basicOver(pose(STANDING), OneShotHint.DELAY_MS + STABLE_MS, roll = 6f)
+
+        assertFalse(Guidance.TrianglePose in out.cues)
+    }
+
+    @Test
+    fun `no pose tip in the dark where the skeleton is unreliable`() {
+        assertFalse(Guidance.TrianglePose in basicOver(pose(STANDING), OneShotHint.DELAY_MS + STABLE_MS, lowLight = true).cues)
+    }
+
+    @Test
+    fun `a face in shadow gets a light tip`() {
+        val out = basicOver(pose(handOnHip), OneShotHint.DELAY_MS + STABLE_MS, faceLuma = 50f, frameLuma = 150f)
+
+        assertEquals(Guidance.FaceInShadow, out.display)
+    }
+
+    /** 0ms부터 untilMs까지 100ms 간격으로 나온 음성 안내 전부. */
+    private fun announcesOver(current: PersonPose, untilMs: Long, faceLuma: Float? = null, frameLuma: Float? = null) =
+        (0..untilMs step 100).fold(LiveState() to emptyList<Guidance>()) { (s, said), now ->
+            val (next, out) = LiveGuidance.stepBasic(s, current, 0f, now, faceLuma = faceLuma, frameLuma = frameLuma)
+            next to (said + listOfNotNull(out.announce))
+        }.second
+
+    @Test
+    fun `a tip is spoken only once`() {
+        val said = announcesOver(pose(STANDING), 20_000)
+
+        assertEquals(listOf<Guidance>(Guidance.TrianglePose), said)
+    }
+
+    @Test
+    fun `the light tip comes first and the pose tip follows`() {
+        val said = announcesOver(pose(STANDING), 20_000, faceLuma = 50f, frameLuma = 150f)
+
+        assertEquals(listOf(Guidance.FaceInShadow, Guidance.TrianglePose), said)
+    }
+
+    @Test
+    fun `the light tip waits while other guidance is showing`() {
+        val out = basicOver(pose(handOnHip), OneShotHint.DELAY_MS + STABLE_MS, roll = 6f, faceLuma = 50f, frameLuma = 150f)
+
+        assertFalse(Guidance.FaceInShadow in out.cues)
+    }
+
+    @Test
+    fun `no light tip without a face brightness`() {
+        val out = basicOver(pose(handOnHip), OneShotHint.DELAY_MS + STABLE_MS, frameLuma = 150f)
+
+        assertFalse(Guidance.FaceInShadow in out.cues)
+    }
+
+    @Test
+    fun `a tip does not stop a template from fitting`() {
+        val fits = pose(STANDING.transformed(scale = 1.17f, dx = -0.085f, dy = -0.10f))
+        val out = basicOver(fits, OneShotHint.DELAY_MS + STABLE_MS, template = CompositionTemplate.FULL_BODY)
+
+        assertTrue(Guidance.TrianglePose in out.cues)
+        assertTrue(out.aligned)
+    }
+
+    // --- 폰 앞뒤 기울기 ---
+
+    @Test
+    fun `basic mode coaches phone pitch for a full body shot`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), 0f, 0, pitchDegrees = 30f)
+
+        assertEquals(Guidance.PhoneTiltedDown, out.display)
+    }
+
+    /** 옆에서 본 앉은 전신: 허벅지 수평, 정강이 수직, 발목이 화면 위쪽(0.72). */
+    private val seatedSide = STANDING.with(
+        Joint.LEFT_KNEE to Point(0.62f, 0.60f),
+        Joint.RIGHT_KNEE to Point(0.38f, 0.60f),
+        Joint.LEFT_ANKLE to Point(0.62f, 0.72f),
+        Joint.RIGHT_ANKLE to Point(0.38f, 0.72f),
+    )
+
+    @Test
+    fun `a seated person is asked to be shot from slightly above, never to lower the phone to the feet`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(seatedSide), 0f, 0, pitchDegrees = -15f)
+
+        assertTrue(Guidance.ShootFromAbove in out.cues)
+        assertFalse(Guidance.FeetToBottom in out.cues)
+    }
+
+    @Test
+    fun `templates handle their own framing so pitch stays quiet`() {
+        val fits = pose(STANDING.transformed(scale = 1.17f, dx = -0.085f, dy = -0.10f))
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), fits, 0f, 0, template = CompositionTemplate.FULL_BODY, pitchDegrees = 30f)
+
+        assertFalse(Guidance.PhoneTiltedDown in out.cues)
+        assertTrue(out.aligned)
+    }
+
+    @Test
+    fun `no pitch coaching in the dark`() {
+        val (_, out) = LiveGuidance.stepBasic(LiveState(), pose(STANDING), 0f, 0, lowLight = true, pitchDegrees = 30f)
+
+        assertFalse(Guidance.PhoneTiltedDown in out.cues)
+    }
 }

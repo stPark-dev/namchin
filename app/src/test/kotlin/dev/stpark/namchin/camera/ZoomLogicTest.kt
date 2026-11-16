@@ -39,4 +39,24 @@ class ZoomLogicTest {
     fun `tele portrait choices are the 1x, 2x and 3x buttons`() {
         assertEquals(listOf(1f, 2f, 3f), ZoomLogic.TELE_CHOICES)
     }
+
+    // --- 인물사진 모드: 삼성 인물사진처럼 1·2·3배만 ---
+
+    @Test
+    fun `portrait mode offers only 1x 2x 3x`() {
+        assertEquals(listOf(1f, 2f, 3f), ZoomLogic.presets(0.6f, 10f, portrait = true))
+    }
+
+    @Test
+    fun `portrait mode snaps any ratio to the nearest of 1x 2x 3x`() {
+        assertEquals(1f, ZoomLogic.portraitZoom(0.6f))
+        assertEquals(1f, ZoomLogic.portraitZoom(1.4f))
+        assertEquals(2f, ZoomLogic.portraitZoom(1.6f))
+        assertEquals(3f, ZoomLogic.portraitZoom(10f))
+    }
+
+    @Test
+    fun `normal mode keeps every lens`() {
+        assertEquals(ZoomLogic.presets(0.6f, 10f), ZoomLogic.presets(0.6f, 10f, portrait = false))
+    }
 }

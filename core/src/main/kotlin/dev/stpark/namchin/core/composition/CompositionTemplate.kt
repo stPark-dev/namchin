@@ -31,10 +31,22 @@ enum class CompositionTemplate {
     DIAGONAL_SPACE,
 
     /** 길·난간처럼 화면 아래에서 모이는 선 끝에 작게 */
-    LEADING_LINES;
+    LEADING_LINES,
+
+    /**
+     * 가운데 세로 칸에 허리 위 상반신, 정수리는 위 가로선 바로 아래 (기류: 가장 쉬운 기본, 1.5~2배로 물러나서).
+     * 허벅지 중간에서 잘리게 둔다 — 무릎·발목 근처에서 끝나면 관절 잘림 안내와 부딪혀 맞추기 어렵다.
+     */
+    CENTER,
+
+    /** 얼굴(코)을 위쪽 3분할 교차점에, 허리 위 상반신 (기류: 상단 두 꼭지점에 인물) */
+    FACE_THIRD,
+
+    /** 작은 전신을 아래 가운데 칸에, 위 2/3는 하늘·풍경 여백 (기류: 하단 중앙 배치) */
+    BOTTOM_CENTER;
 
     /** 왼쪽·오른쪽 중 인물에 가까운 쪽을 고르는 틀 */
-    val hasSide: Boolean get() = this == SIDE_THIRD || this == GOLDEN_SPIRAL || this == DIAGONAL_SPACE
+    val hasSide: Boolean get() = this == SIDE_THIRD || this == GOLDEN_SPIRAL || this == DIAGONAL_SPACE || this == FACE_THIRD
 
     /** 인물이 있어야 할 자리. side는 hasSide인 틀에서만 쓴다 */
     fun target(side: Side?): PersonFrame = when (this) {
@@ -46,6 +58,12 @@ enum class CompositionTemplate {
         GOLDEN_SPIRAL -> PersonFrame(onSide(1f - GoldenSpiral.EYE, side), GoldenSpiral.EYE - SMALL_TORSO, SMALL_TORSO, SMALL_NECK)
         DIAGONAL_SPACE -> PersonFrame(onSide(DIAGONAL_X, side), SMALL_FEET_Y - TINY_TORSO * FEET_PER_TORSO, TINY_TORSO, TINY_NECK)
         LEADING_LINES -> PersonFrame(0.5f, SMALL_FEET_Y - TINY_TORSO * FEET_PER_TORSO, TINY_TORSO, TINY_NECK)
+        // 정수리(어깨 - 목 × 1.7)가 위 가로선 바로 아래
+        CENTER -> PersonFrame(0.5f, CENTER_HEAD_TOP + HEAD_PER_NECK * CENTER_TORSO * NECK_PER_TORSO, CENTER_TORSO, CENTER_TORSO * NECK_PER_TORSO)
+        // 코(어깨 - 목)가 위 가로선
+        FACE_THIRD -> PersonFrame(if (side == Side.RIGHT) 2f / 3 else 1f / 3, 1f / 3 + FACE_THIRD_TORSO * NECK_PER_TORSO, FACE_THIRD_TORSO, FACE_THIRD_TORSO * NECK_PER_TORSO)
+        // 정수리가 아래 가로선(2/3) 근처, 발끝 약 0.95
+        BOTTOM_CENTER -> PersonFrame(0.5f, 2f / 3 + HEAD_PER_NECK * TINY_NECK, TINY_TORSO, TINY_NECK)
     }
 
     companion object {
@@ -63,6 +81,16 @@ enum class CompositionTemplate {
         // 더 작으면 골반 인식이 흔들려 맞음/안 맞음이 깜빡인다
         private const val TINY_TORSO = 0.09f
         private const val TINY_NECK = 0.036f
+
+        /** 목(코~어깨) / 몸통 (정면 차렷) */
+        private const val NECK_PER_TORSO = 0.4f
+
+        /** 정수리~어깨 / 목 */
+        private const val HEAD_PER_NECK = 1.7f
+        // 크기 ±15%·위치 ±0.06 안에서 화면 아래 끝이 늘 허벅지 중간에 오도록 (무릎이 1.04 아래로 안 올라옴)
+        private const val CENTER_TORSO = 0.38f
+        private const val CENTER_HEAD_TOP = 0.335f
+        private const val FACE_THIRD_TORSO = 0.46f
 
         /** 왼쪽 기준 x를 고른 쪽으로 */
         private fun onSide(leftX: Float, side: Side?) = if (side == Side.RIGHT) 1f - leftX else leftX
@@ -123,8 +151,12 @@ object TemplateCoach {
     }
 
     /** 작은 전신을 배경 속에 두는 틀은 발끝·머리 위 여백 규칙과 반대, 한쪽에 두는 틀은 시선 여백 규칙과 부딪힌다 */
+    private val CENTERED = setOf(CompositionTemplate.CENTER, CompositionTemplate.BOTTOM_CENTER)
+
     private fun conflicts(template: CompositionTemplate, cue: Guidance): Boolean = when (template) {
         CompositionTemplate.FULL_BODY, CompositionTemplate.HALF_BODY -> false
-        else -> cue == Guidance.FeetToBottom || cue == Guidance.TooMuchHeadroom || (template.hasSide && cue is Guidance.GazeSpace)
+        // 가운데에 두는 틀에서 고개를 돌리면 "옆에 여백" 안내가 가운데로 끌어오는 안내와 부딪힌다
+        else -> cue == Guidance.FeetToBottom || cue == Guidance.TooMuchHeadroom ||
+            (cue is Guidance.GazeSpace && (template.hasSide || template in CENTERED))
     }
 }

@@ -1,8 +1,16 @@
 package dev.stpark.namchin.ui.camera
 
+import dev.stpark.namchin.ui.theme.Brand
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
+import dev.stpark.namchin.camera.FocusPoint
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.geometry.Offset
 import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -37,7 +46,8 @@ import kotlin.math.abs
 private const val ANALYSIS_ASPECT = 3f / 4f
 
 /** 줌 상태: 현재 배율과 카메라가 지원하는 범위 (카메라 준비 전엔 range = null). 표시용. */
-internal data class ZoomState(val ratio: Float, val range: ClosedFloatingPointRange<Float>?)
+/** @property portrait 인물사진(배경 흐림) 모드: 찍힐 화각과 같게 배율 버튼을 1·2·3배만, 핀치 줌 없음 */
+internal data class ZoomState(val ratio: Float, val range: ClosedFloatingPointRange<Float>?, val portrait: Boolean = false)
 
 /**
  * 3:4 미리보기와 그 위의 모든 겹침: 격자·레퍼런스 고스트·골격·꺾쇠·수평계·안내 캡슐·아이콘 줄·줌·플래시·토스트.
@@ -53,6 +63,15 @@ internal fun Viewfinder(
     onPinch: (Float) -> Unit,
     onGrid: (Boolean) -> Unit,
     onCameraReady: (Camera, ImageCapture) -> Unit,
+    /** 인물사진 버튼 상태 (null이면 이 폰은 지원 안 해서 숨김) */
+    portrait: Boolean?,
+    onPortrait: (Boolean) -> Unit,
+    /** 배경 흐림 촬영 세션으로 연결 (찍는 동안만) */
+    portraitSession: Boolean,
+    onPortraitOffered: (Boolean) -> Unit,
+    onPortraitActive: (Boolean) -> Unit,
+    onPortraitFailed: () -> Unit,
+    onUnbound: () -> Unit,
     flash: Boolean,
     message: Int?,
 ) {
@@ -63,6 +82,13 @@ internal fun Viewfinder(
     val currentOnPinch by rememberUpdatedState(onPinch)
     // 구도 틀 / 필터 고르기 줄 (한 번에 하나만)
     var picker by rememberSaveable { mutableStateOf(Picker.NONE) }
+    // 탭해서 고른 초점: 카메라에 넘길 위치(미리보기 기준)와 화면에 그릴 초점 원 자리(탭한 곳)
+    var focus by remember { mutableStateOf<FocusPoint?>(null) }
+    var focusRing by remember { mutableStateOf<Offset?>(null) }
+    val upsideDown by rememberUpdatedState(state.upsideDown)
+    LaunchedEffect(focusRing) { if (focusRing != null) { delay(FOCUS_RING_MS); focusRing = null } }
+    // 카메라는 탭한 초점을 몇 초 뒤 자동 초점으로 되돌리므로, 그때까지만 기억한다 (배경 흐림 촬영에서 다시 맞출 때 씀)
+    LaunchedEffect(focus) { if (focus != null) { delay(FOCUS_REMEMBER_MS); focus = null } }
     Box(
         Modifier
             .fillMaxWidth()
@@ -70,6 +96,12 @@ internal fun Viewfinder(
             .pointerInput(zoom.range) {
                 if (zoom.range == null) return@pointerInput
                 detectTransformGestures { _, _, scale, _ -> currentOnPinch(scale) }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures { at ->
+                    focus = FocusPoint.fromTap(at.x, at.y, size.width.toFloat(), size.height.toFloat(), upsideDown)
+                    focusRing = at
+                }
             },
     ) {
         CameraPreview(
@@ -79,7 +111,15 @@ internal fun Viewfinder(
             onCameraReady = onCameraReady,
             modifier = Modifier.fillMaxSize(),
             filter = state.filter,
+            portrait = portraitSession,
+            upsideDown = state.upsideDown,
+            focus = focus,
+            onPortraitOffered = onPortraitOffered,
+            onPortraitActive = onPortraitActive,
+            onPortraitFailed = onPortraitFailed,
+            onUnbound = onUnbound,
         )
+        focusRing?.let { FocusRing(it, Modifier.fillMaxSize()) }
         val region = state.region
         if (region != null && grid) GridOverlay(region, Modifier.fillMaxSize())
         if (region != null) {
@@ -117,6 +157,8 @@ internal fun Viewfinder(
             filterLabel = stringResource(R.string.cd_filter_current, stringResource(lookLabel(state.filter?.let(Look::Preset)))),
             filterActive = state.filter != null,
             onFilter = { picker = if (picker == Picker.FILTER) Picker.NONE else Picker.FILTER },
+            portrait = portrait,
+            onPortrait = onPortrait,
         )
         Column(
             Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
@@ -135,7 +177,7 @@ internal fun Viewfinder(
             }
             zoom.range?.let { range ->
                 ZoomCapsule(
-                    presets = ZoomLogic.presets(range.start, range.endInclusive),
+                    presets = ZoomLogic.presets(range.start, range.endInclusive, zoom.portrait),
                     current = zoom.ratio,
                     onSelect = onZoom,
                 )
@@ -147,3 +189,15 @@ internal fun Viewfinder(
 }
 
 private enum class Picker { NONE, TEMPLATE, FILTER }
+
+/** 탭한 자리에 잠깐 그리는 노란 초점 원 */
+@Composable
+private fun FocusRing(at: Offset, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        drawCircle(Brand.Yellow, radius = FOCUS_RING_RADIUS.toPx(), center = at, style = Stroke(width = 2.dp.toPx()))
+    }
+}
+
+private const val FOCUS_RING_MS = 900L
+private const val FOCUS_REMEMBER_MS = 5_000L
+private val FOCUS_RING_RADIUS = 36.dp

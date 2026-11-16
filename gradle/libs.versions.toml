@@ -43,6 +43,7 @@ camerax-core = { module = "androidx.camera:camera-core", version.ref = "camerax"
 camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+camerax-extensions = { module = "androidx.camera:camera-extensions", version.ref = "camerax" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }

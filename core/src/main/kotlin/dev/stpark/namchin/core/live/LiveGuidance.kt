@@ -1,7 +1,9 @@
 package dev.stpark.namchin.core.live
 
+import dev.stpark.namchin.core.composition.CameraAngle
 import dev.stpark.namchin.core.composition.CompositionAnalyzer
 import dev.stpark.namchin.core.composition.CompositionTemplate
+import dev.stpark.namchin.core.composition.PoseHint
 import dev.stpark.namchin.core.composition.TemplateCoach
 import dev.stpark.namchin.core.framing.FramingAnalyzer
 import dev.stpark.namchin.core.framing.PersonFrame
@@ -48,6 +50,11 @@ data class LiveState(
     val templateSide: Guidance.Side? = null,
     /** 구도 틀에 마지막으로 맞았던 시각 (인식이 잠깐 끊겨도 맞음을 유지) */
     val templateFitAtMs: Long? = null,
+    /** 직전 프레임 판정 (기준 느슨하게 유지용) */
+    val armsStiff: Boolean = false,
+    val faceDark: Boolean = false,
+    val poseHint: HintTimer = HintTimer(),
+    val lightHint: HintTimer = HintTimer(),
     val guidance: GuidanceState = GuidanceState(),
     val shutter: ShutterState = ShutterState.Idle,
 )
@@ -82,6 +89,10 @@ object LiveGuidance {
      * 기본 모드(레퍼런스 없음): 수평 + 일반 구도 규칙, 구도 틀을 골랐으면 틀에 맞추는 안내.
      * 풍경만 찍을 수도 있으니 인물이 없어도 재촉하지 않는다.
      * 자동 셔터는 없다. aligned는 구도 틀에 맞고 다른 안내도 없을 때만 (초록 표시용).
+     * 다른 안내가 없으면 빛·포즈 한마디를 한 번씩 (틀 맞음에는 영향 없음).
+     * @param faceLuma 얼굴 영역 평균 밝기 (0..255), 모르면 null
+     * @param frameLuma 화면 평균 밝기 (0..255), 모르면 null
+     * @param pitchDegrees 폰 앞뒤 기울기 (카메라가 아래를 보면 양수), 모르면 null
      */
     fun stepBasic(
         state: LiveState,
@@ -93,6 +104,9 @@ object LiveGuidance {
         zoomRatio: Float = 1f,
         teleTarget: Float = 1f,
         template: CompositionTemplate? = null,
+        faceLuma: Float? = null,
+        frameLuma: Float? = null,
+        pitchDegrees: Float? = null,
     ): Pair<LiveState, LiveOutput> {
         val tele = TeleShot.cue(zoomRatio, teleTarget, current != null)
         val fitted = template?.let { TemplateCoach.analyze(it, current, state.templateSide, state.previousCues) }
@@ -100,14 +114,37 @@ object LiveGuidance {
         val composition = when {
             tele != null -> emptyList()
             fitted != null -> fitted.cues
-            else -> current?.let { CompositionAnalyzer.analyze(it, state.previousCues) }.orEmpty()
+            // 앉은 사람에게 "무릎 높이로 낮춰 발끝을 아래에"는 맞지 않는다 (살짝 위에서 찍는 게 기본)
+            else -> current?.let { pose ->
+                CompositionAnalyzer.analyze(pose, state.previousCues)
+                    .filterNot { it == Guidance.FeetToBottom && CameraAngle.seated(pose) }
+            }.orEmpty()
         }
-        val cues = holdSteady(lowLight, shaky) +
+        val coaching = holdSteady(lowLight, shaky) +
             listOfNotNull(rollDegrees?.let { FramingAnalyzer.levelCue(it, state.previousCues) }) +
-            composition + listOfNotNull(tele)
+            composition +
+            // 구도 틀은 기울이기 안내를 스스로 하므로 겹치지 않게 빼고, 야간엔 골격이 부정확해 뺀다
+            listOfNotNull(
+                current?.takeIf { tele == null && template == null && !lowLight }
+                    ?.let { CameraAngle.cue(it, pitchDegrees, state.previousCues) },
+            ) +
+            listOfNotNull(tele)
+        // 야간엔 골격·밝기 비교가 부정확하므로 한마디를 하지 않는다
+        val person = current?.takeIf { !lowLight }
+        val armsStiff = person?.let { PoseHint.stiffArms(it, state.armsStiff) } ?: false
+        val faceDark = person?.let(FaceLight::faceBox)?.let {
+            if (faceLuma != null && frameLuma != null) FaceLight.dark(faceLuma, frameLuma, state.faceDark) else null
+        } ?: false
+        val quiet = coaching.isEmpty()
+        val (lightHint, showLight) = OneShotHint.step(state.lightHint, quiet && faceDark, nowMs)
+        // 두 한마디가 겹치면 빛 먼저, 포즈는 빛 한마디가 끝난 뒤에 (안 그러면 보이지도 않고 소진된다)
+        val lightPending = faceDark && !lightHint.spent
+        val (poseHint, showPose) = OneShotHint.step(state.poseHint, quiet && armsStiff && !lightPending, nowMs)
+        val cues = coaching +
+            listOfNotNull(Guidance.FaceInShadow.takeIf { showLight }, Guidance.TrianglePose.takeIf { showPose })
         val decision = GuidancePrioritizer.decide(cues, state.guidance, nowMs)
         // 야간엔 골격이 부정확하므로 맞음(노랑·진동)을 내지 않는다
-        val fitsNow = fitted?.fits == true && cues.isEmpty() && !lowLight
+        val fitsNow = fitted?.fits == true && quiet && !lowLight
         val lastFit = state.templateFitAtMs
         val dropout = template != null && current == null && tele == null &&
             lastFit != null && nowMs - lastFit <= FIT_GRACE_MS
@@ -117,6 +154,10 @@ object LiveGuidance {
             guidance = decision.state,
             templateSide = fitted?.side,
             templateFitAtMs = if (fitsNow) nowMs else lastFit.takeIf { dropout },
+            armsStiff = armsStiff,
+            faceDark = faceDark,
+            poseHint = poseHint,
+            lightHint = lightHint,
         )
         return nextState to LiveOutput(decision.display, cues, decision.announce, aligned = aligned, match = null)
     }

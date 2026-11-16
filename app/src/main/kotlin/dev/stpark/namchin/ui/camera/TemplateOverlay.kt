@@ -130,6 +130,9 @@ fun templateLabel(template: CompositionTemplate?): Int = when (template) {
     CompositionTemplate.GOLDEN_SPIRAL -> R.string.template_golden_spiral
     CompositionTemplate.DIAGONAL_SPACE -> R.string.template_diagonal
     CompositionTemplate.LEADING_LINES -> R.string.template_leading_lines
+    CompositionTemplate.CENTER -> R.string.template_center
+    CompositionTemplate.FACE_THIRD -> R.string.template_face_third
+    CompositionTemplate.BOTTOM_CENTER -> R.string.template_bottom_center
 }
 
 /** 어깨 → 허리 → 두 다리로 이어지는 몸 윤곽 (머리 제외). */

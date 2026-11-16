@@ -26,6 +26,10 @@ class GuidanceTextTest {
         Guidance.FeetToBottom,
         Guidance.TooMuchHeadroom,
         Guidance.TeleZoom(2f),
+        Guidance.FaceInShadow,
+        Guidance.TrianglePose,
+        Guidance.PhoneTiltedDown,
+        Guidance.ShootFromAbove,
     ) + Guidance.CutPoint.entries.map { Guidance.CutAtJoint(it) } +
         Guidance.Side.entries.map { Guidance.GazeSpace(it) }
 
