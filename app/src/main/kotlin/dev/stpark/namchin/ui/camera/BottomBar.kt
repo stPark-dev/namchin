@@ -25,7 +25,6 @@ import dev.stpark.namchin.data.Reference
 @Composable
 internal fun BottomBar(
     state: CameraUiState,
-    latestReference: Reference?,
     cards: List<Reference>,
     shutterEnabled: Boolean,
     debugInfo: Boolean,
@@ -33,7 +32,6 @@ internal fun BottomBar(
     peekDistancePx: Float,
     onShutter: () -> Unit,
     onLongShutter: () -> Unit,
-    onOpenLibrary: () -> Unit,
     onExpandCards: () -> Unit,
     modifier: Modifier = Modifier,
     latestPhoto: ImageBitmap? = null,
@@ -41,11 +39,9 @@ internal fun BottomBar(
 ) {
     Box(modifier) {
         ShutterBar(
-            latestReference = latestReference,
             enabled = shutterEnabled,
             onShutter = onShutter,
             onLongShutter = onLongShutter,
-            onOpenLibrary = onOpenLibrary,
             modifier = Modifier.fillMaxSize(),
             latestPhoto = latestPhoto,
             onOpenGallery = onOpenGallery,

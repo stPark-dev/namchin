@@ -2,9 +2,6 @@ package dev.stpark.namchin.ui.camera
 
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +21,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.stpark.namchin.R
-import dev.stpark.namchin.data.Reference
 import dev.stpark.namchin.ui.theme.Brand
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PhotoLibrary
@@ -33,54 +29,33 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 
-/** 기본 카메라 앱처럼: 왼쪽 갤러리(레퍼런스 관리), 가운데 셔터. */
+/** 기본 카메라 앱처럼: 왼쪽 갤러리(마지막으로 찍은 사진), 가운데 셔터. 레퍼런스 추가는 카드 손패를 펼친 '레퍼런스 고르기'에서 */
 @Composable
 fun ShutterBar(
-    latestReference: Reference?,
     enabled: Boolean,
     onShutter: () -> Unit,
     onLongShutter: () -> Unit,
-    onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
     latestPhoto: ImageBitmap? = null,
     onOpenGallery: () -> Unit = {},
 ) {
     Box(modifier) {
-        // 셔터 왼쪽: 레퍼런스 보관함, 갤러리(마지막으로 찍은 사진)
-        Row(
-            Modifier.align(Alignment.CenterStart).padding(start = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        val galleryLabel = stringResource(R.string.cd_open_gallery)
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 32.dp)
+                .size(GALLERY_SIZE)
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.5.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                .clickable(onClickLabel = galleryLabel, onClick = onOpenGallery)
+                .semantics { contentDescription = galleryLabel },
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier
-                    .size(LIBRARY_SIZE)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.5.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
-                    .clickable(onClick = onOpenLibrary),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (latestReference != null) {
-                    ReferenceCard(latestReference, Modifier.size(LIBRARY_SIZE))
-                } else {
-                    Icon(Icons.Rounded.PhotoLibrary, stringResource(R.string.camera_gallery), tint = Color.White)
-                }
-            }
-            val galleryLabel = stringResource(R.string.cd_open_gallery)
-            Box(
-                Modifier
-                    .size(GALLERY_SIZE)
-                    .clip(CircleShape)
-                    .border(1.5.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-                    .clickable(onClickLabel = galleryLabel, onClick = onOpenGallery)
-                    .semantics { contentDescription = galleryLabel },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (latestPhoto != null) {
-                    Image(latestPhoto, null, contentScale = ContentScale.Crop, modifier = Modifier.size(GALLERY_SIZE))
-                } else {
-                    Icon(Icons.Rounded.Image, null, tint = Color.White)
-                }
+            if (latestPhoto != null) {
+                Image(latestPhoto, null, contentScale = ContentScale.Crop, modifier = Modifier.size(GALLERY_SIZE))
+            } else {
+                Icon(Icons.Rounded.PhotoLibrary, null, tint = Color.White)
             }
         }
         val shutterLabel = stringResource(R.string.camera_shutter)
@@ -120,5 +95,4 @@ private fun LensShutter(enabled: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
-private val LIBRARY_SIZE = 52.dp
-private val GALLERY_SIZE = 44.dp
+private val GALLERY_SIZE = 56.dp

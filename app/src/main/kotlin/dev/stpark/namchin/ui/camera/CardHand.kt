@@ -1,5 +1,7 @@
 package dev.stpark.namchin.ui.camera
 
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -100,6 +102,7 @@ fun ReferenceCard(reference: Reference, modifier: Modifier = Modifier, loadSize:
 
 /**
  * 오른쪽 아래 모서리에 2~3장 빼꼼. 카드를 탭하거나 꾹 눌러 끌어올리면 크게 보기, 손패를 위로 쓸면 전체 펼침.
+ * 레퍼런스가 없으면 '+' 빈 카드 한 장 (탭하거나 위로 쓸면 펼쳐서 거기서 추가).
  * @param references 앞에 보일 순서대로 (첫 번째가 맨 앞)
  */
 @Composable
@@ -116,8 +119,7 @@ fun CardHand(
     val haptic = LocalHapticFeedback.current
     val bounds = remember { mutableMapOf<Long, Rect>() }
     val shown = references.take(CardFan.MAX_CARDS)
-    if (shown.isEmpty()) return
-    val fan = CardFan.layout(shown.size)
+    val fan = CardFan.layout(maxOf(shown.size, 1))
     Box(
         modifier
             // 화면 가장자리(내비게이션 바 위)에서 잘려 "빼꼼" 보이게
@@ -138,6 +140,16 @@ fun CardHand(
             },
         contentAlignment = Alignment.BottomEnd,
     ) {
+        if (shown.isEmpty()) {
+            val pose = fan.last()
+            EmptyCard(
+                Modifier
+                    .offset((pose.offsetXDp + 30).dp, (pose.offsetYDp + 12).dp)
+                    .rotate(pose.rotationDeg)
+                    .size(96.dp, 128.dp)
+                    .clickable(onClick = onExpand),
+            )
+        }
         // fan은 뒤→앞 순서, shown은 앞→뒤 순서
         shown.asReversed().zip(fan).forEach { (reference, pose) ->
             ReferenceCard(
@@ -177,7 +189,24 @@ fun CardHand(
     }
 }
 
-/** 손패를 펼친 전체 목록. 탭하면 적용하고 닫힌다. */
+/** 레퍼런스가 없을 때 손패 자리의 '+' 카드 */
+@Composable
+private fun EmptyCard(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Brand.Ink.copy(alpha = 0.6f))
+            .border(1.5.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Rounded.Add, null, tint = Color.White)
+            Text(stringResource(R.string.deck_add_short), color = Color.White, fontSize = 13.sp)
+        }
+    }
+}
+
+/** 손패를 펼친 전체 목록. 탭하면 적용하고 닫힌다. 제목 줄의 '+ 추가'로 레퍼런스를 더한다. */
 @Composable
 fun CardDeck(
     references: List<Reference>,
@@ -202,6 +231,11 @@ fun CardDeck(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
+                // 레퍼런스 추가는 여기서 (카메라 화면 셔터 왼쪽 버튼은 갤러리)
+                TextButton(onClick = onAddReference) {
+                    Icon(Icons.Rounded.Add, null, tint = Brand.Yellow)
+                    Text(stringResource(R.string.deck_add_short), color = Brand.Yellow)
+                }
                 IconButton(onClick = onClose) {
                     Icon(Icons.Rounded.Close, stringResource(R.string.cd_close), tint = Color.White)
                 }

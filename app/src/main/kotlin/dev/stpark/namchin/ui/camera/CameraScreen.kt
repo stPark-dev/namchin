@@ -360,7 +360,6 @@ private fun CameraContent(
             }
             BottomBar(
                 state = state,
-                latestReference = all.firstOrNull(),
                 // 지금 장면과 배경이 비슷한 레퍼런스가 앞으로
                 cards = orderedCards.filter { it.id != referenceId },
                 shutterEnabled = canShoot && !reviewing,
@@ -369,7 +368,6 @@ private fun CameraContent(
                 peekDistancePx = peekDistancePx,
                 onShutter = { shoot(1) },
                 onLongShutter = { shoot(appSettings.burstCount) },
-                onOpenLibrary = onOpenLibrary,
                 onExpandCards = { deckOpen = true },
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 latestPhoto = latestPhoto?.second,
