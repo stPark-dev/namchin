@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +36,8 @@ internal fun BottomBar(
     onOpenLibrary: () -> Unit,
     onExpandCards: () -> Unit,
     modifier: Modifier = Modifier,
+    latestPhoto: ImageBitmap? = null,
+    onOpenGallery: () -> Unit = {},
 ) {
     Box(modifier) {
         ShutterBar(
@@ -44,6 +47,8 @@ internal fun BottomBar(
             onLongShutter = onLongShutter,
             onOpenLibrary = onOpenLibrary,
             modifier = Modifier.fillMaxSize(),
+            latestPhoto = latestPhoto,
+            onOpenGallery = onOpenGallery,
         )
         if (debugInfo) DebugStats(state, Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 4.dp))
         CardHand(

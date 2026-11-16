@@ -1,5 +1,11 @@
 package dev.stpark.namchin.ui.camera
 
+import dev.stpark.namchin.capture.CaptureGallery
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import android.net.Uri
 import android.util.Log
 import android.Manifest
 import android.content.pm.PackageManager
@@ -157,6 +163,18 @@ private fun CameraContent(
     var capturing by remember { mutableStateOf(false) }
     var flash by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<Int?>(null) }
+    // 셔터 옆 갤러리 버튼: 마지막으로 저장한 사진 (주소, 썸네일). 찍거나 앱으로 돌아오면 다시 읽는다
+    var latestPhoto by remember { mutableStateOf<Pair<Uri, ImageBitmap>?>(null) }
+    var photoRefresh by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { photoRefresh++ }
+    LaunchedEffect(photoRefresh, reviewing) {
+        if (reviewing) return@LaunchedEffect
+        latestPhoto = withContext(Dispatchers.IO) {
+            CaptureGallery.latest(context)?.let { uri ->
+                CaptureGallery.thumbnail(context, uri, GALLERY_THUMB_PX)?.let { uri to it.asImageBitmap() }
+            }
+        }
+    }
     val zoomRange = camera?.cameraInfo?.zoomState?.value?.let { it.minZoomRatio..it.maxZoomRatio }
     fun setZoom(ratio: Float) {
         val range = zoomRange ?: return
@@ -224,6 +242,7 @@ private fun CameraContent(
         if (state.settings.vibrate) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         PhotoSaver.takeBurst(context, capture, count, appSettings.shutterSound, isActive = { screenActive.get() }) { saved ->
             capturing = false
+            photoRefresh++
             // 배경 흐림으로 찍었으면 일반 카메라로 돌아가 코칭을 이어 간다
             portraitSession = false
             when {
@@ -353,6 +372,8 @@ private fun CameraContent(
                 onOpenLibrary = onOpenLibrary,
                 onExpandCards = { deckOpen = true },
                 modifier = Modifier.fillMaxWidth().weight(1f),
+                latestPhoto = latestPhoto?.second,
+                onOpenGallery = { CaptureGallery.open(context, latestPhoto?.first) },
             )
         }
         PeekOverlay(
@@ -408,6 +429,7 @@ private val CHIP_WIDTH = 64.dp
 private val CHIP_HEIGHT = 80.dp
 private val CHIP_CARD_INSET = 8.dp
 private const val UPSIDE_DOWN_DEG = 180f
+private const val GALLERY_THUMB_PX = 144
 
 /** 배경 흐림 세션이 열린 뒤 노출·초점이 잡히길 기다리는 시간 */
 private const val PORTRAIT_SETTLE_MS = 1_500L

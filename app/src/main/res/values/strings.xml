@@ -57,6 +57,7 @@
     <string name="library_title">레퍼런스</string>
     <string name="library_to_camera">카메라</string>
     <string name="camera_gallery">레퍼런스</string>
+    <string name="cd_open_gallery">갤러리에서 마지막 사진 보기</string>
     <string name="camera_shutter">촬영</string>
     <string name="camera_saved">갤러리에 저장했어요</string>
     <string name="camera_save_failed">저장하지 못했어요</string>
